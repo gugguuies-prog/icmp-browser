@@ -21,8 +21,13 @@
 #endif
 
 // Forward declarations
-static THREAD_RETURN_TYPE THREAD_CALL accept_thread_func(void *arg);
-static THREAD_RETURN_TYPE THREAD_CALL client_handler_thread(void *arg);
+#ifdef _WIN32
+static unsigned __stdcall accept_thread_func(void *arg);
+static unsigned __stdcall client_handler_thread(void *arg);
+#else
+static void* accept_thread_func(void *arg);
+static void* client_handler_thread(void *arg);
+#endif
 
 /**
  * Initialize Windows sockets (Windows only)
@@ -196,7 +201,11 @@ void http_proxy_destroy(http_proxy_t *proxy) {
 /**
  * Accept thread - accepts new client connections
  */
-static THREAD_RETURN_TYPE THREAD_CALL accept_thread_func(void *arg) {
+#ifdef _WIN32
+static unsigned __stdcall accept_thread_func(void *arg) {
+#else
+static void* accept_thread_func(void *arg) {
+#endif
     http_proxy_t *proxy = (http_proxy_t*)arg;
     
     while (proxy->running) {
@@ -242,7 +251,7 @@ static THREAD_RETURN_TYPE THREAD_CALL accept_thread_func(void *arg) {
         client->proxy = proxy;  // Set proxy pointer
         
         // Start client handler thread
-        if (thread_create(&client->thread, client_handler_thread, client) != 0) {
+        if (thread_create(&client->thread, (thread_func_t)client_handler_thread, client) != 0) {
             close(client_socket);
             client->active = 0;
             mutex_unlock(&proxy->clients_lock);
@@ -256,13 +265,21 @@ static THREAD_RETURN_TYPE THREAD_CALL accept_thread_func(void *arg) {
                inet_ntoa(client_addr.sin_addr), client->connection_id);
     }
     
+#ifdef _WIN32
+    return 0;
+#else
     return NULL;
+#endif
 }
 
 /**
  * Client handler thread - handles individual client connection
  */
-static THREAD_RETURN_TYPE THREAD_CALL client_handler_thread(void *arg) {
+#ifdef _WIN32
+static unsigned __stdcall client_handler_thread(void *arg) {
+#else
+static void* client_handler_thread(void *arg) {
+#endif
     http_client_t *client = (http_client_t*)arg;
     http_proxy_t *proxy = client->proxy;  // Get proxy from client
     
@@ -321,7 +338,11 @@ static THREAD_RETURN_TYPE THREAD_CALL client_handler_thread(void *arg) {
     
     printf("[HTTP Proxy] Client disconnected (ID %u)\n", client->connection_id);
     
+#ifdef _WIN32
+    return 0;
+#else
     return NULL;
+#endif
 }
 
 /**
