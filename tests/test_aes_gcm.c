@@ -225,9 +225,17 @@ void test_large_data_encryption() {
     
     // MTU size for ICMP: 1472 bytes
     const size_t data_size = 1472;
-    uint8_t plaintext[data_size];
-    uint8_t ciphertext[data_size];
-    uint8_t decrypted[data_size];
+    uint8_t *plaintext = (uint8_t*)malloc(data_size);
+    uint8_t *ciphertext = (uint8_t*)malloc(data_size);
+    uint8_t *decrypted = (uint8_t*)malloc(data_size);
+    
+    if (!plaintext || !ciphertext || !decrypted) {
+        printf("Memory allocation failed\n");
+        free(plaintext);
+        free(ciphertext);
+        free(decrypted);
+        return 0;
+    }
     
     // Fill with test pattern
     for (size_t i = 0; i < data_size; i++) {
@@ -269,6 +277,11 @@ void test_large_data_encryption() {
     // Verify
     assert(memcmp(plaintext, decrypted, data_size) == 0);
     printf("✓ Data integrity verified\n");
+    
+    // Cleanup
+    free(plaintext);
+    free(ciphertext);
+    free(decrypted);
     
     printf(COLOR_GREEN "✓✓✓ Test 4 PASSED\n" COLOR_RESET);
 }

@@ -9,7 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include <windows.h>
+#define sleep(x) Sleep((x) * 1000)
+#endif
 
 // Test counters
 static int tests_run = 0;

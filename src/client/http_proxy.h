@@ -77,7 +77,7 @@ typedef struct http_proxy_s http_proxy_t;  // Forward declaration
 typedef struct {
     int socket_fd;          // Client socket
     struct sockaddr_in addr; // Client address
-    pthread_t thread;       // Handler thread
+    thread_t thread;        // Handler thread
     int active;             // Connection active
     uint32_t connection_id; // Unique connection ID
     time_t last_activity;   // Last activity timestamp
@@ -89,7 +89,7 @@ struct http_proxy_s {
     int listen_socket;              // Listening socket
     uint16_t port;                  // Listen port
     int running;                    // Server running flag
-    pthread_t accept_thread;        // Accept thread
+    thread_t accept_thread;         // Accept thread
     http_client_t *clients;         // Client connections array
     size_t max_clients;             // Maximum concurrent clients
     mutex_t clients_lock;           // Mutex for clients array
