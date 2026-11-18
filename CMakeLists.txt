@@ -101,10 +101,9 @@ if(PLATFORM_LINUX AND BUILD_SERVER)
         src/server/icmp_handler.c
         src/server/session_manager.c
         src/server/tun_device.c
-        # TODO: Add server main program
     )
     
-    # Server library (for now)
+    # Server library
     add_library(icmp_server_lib STATIC
         ${SERVER_SOURCES}
         ${COMMON_SOURCES}
@@ -117,7 +116,19 @@ if(PLATFORM_LINUX AND BUILD_SERVER)
         Threads::Threads
     )
     
-    message(STATUS "Building Linux server library: libicmp_server_lib.a")
+    # Server executable
+    add_executable(icmp_server
+        src/server/main.c
+    )
+    
+    target_link_libraries(icmp_server PRIVATE
+        icmp_server_lib
+        ${OPENSSL_LIBRARIES}
+        ${ZLIB_LIBRARIES}
+        Threads::Threads
+    )
+    
+    message(STATUS "Building Linux server: icmp_server")
     
 endif()
 
