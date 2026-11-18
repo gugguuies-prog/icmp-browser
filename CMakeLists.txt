@@ -21,8 +21,8 @@ endif()
 
 # Find required packages
 if(PLATFORM_WINDOWS)
-    # WebView2 SDK (must be installed via NuGet or manual download)
-    find_package(Microsoft.Web.WebView2 REQUIRED)
+    # WebView2 SDK (installed via vcpkg)
+    find_package(unofficial-webview2 CONFIG REQUIRED)
 endif()
 
 find_package(OpenSSL REQUIRED)
@@ -78,7 +78,7 @@ if(PLATFORM_WINDOWS AND BUILD_CLIENT)
         iphlpapi
         ws2_32
         comctl32
-        Microsoft.Web.WebView2::WebView2
+        unofficial::webview2::webview2
     )
     
     # Set subsystem to Windows
