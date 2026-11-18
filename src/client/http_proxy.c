@@ -21,8 +21,8 @@
 #endif
 
 // Forward declarations
-static void* accept_thread_func(void *arg);
-static void* client_handler_thread(void *arg);
+static THREAD_RETURN_TYPE THREAD_CALL accept_thread_func(void *arg);
+static THREAD_RETURN_TYPE THREAD_CALL client_handler_thread(void *arg);
 
 /**
  * Initialize Windows sockets (Windows only)
@@ -196,7 +196,7 @@ void http_proxy_destroy(http_proxy_t *proxy) {
 /**
  * Accept thread - accepts new client connections
  */
-static void* accept_thread_func(void *arg) {
+static THREAD_RETURN_TYPE THREAD_CALL accept_thread_func(void *arg) {
     http_proxy_t *proxy = (http_proxy_t*)arg;
     
     while (proxy->running) {
@@ -262,7 +262,7 @@ static void* accept_thread_func(void *arg) {
 /**
  * Client handler thread - handles individual client connection
  */
-static void* client_handler_thread(void *arg) {
+static THREAD_RETURN_TYPE THREAD_CALL client_handler_thread(void *arg) {
     http_client_t *client = (http_client_t*)arg;
     http_proxy_t *proxy = client->proxy;  // Get proxy from client
     

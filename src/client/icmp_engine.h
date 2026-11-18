@@ -58,7 +58,7 @@ typedef struct {
  * ICMP session structure
  * Manages connection to a remote server via ICMP
  */
-typedef struct {
+typedef struct icmp_session_s {
     // Windows ICMP handle
     HANDLE hIcmp;                        // IcmpCreateFile handle
     
