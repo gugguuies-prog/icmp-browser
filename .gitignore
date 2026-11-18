@@ -1,4 +1,23 @@
+# Build directories
+build/
+build-*/
+bin/
+*.exe
 *.o
-test_client
-test_server
-icmptunnel
+*.a
+*.so
+*.dll
+
+# IDE
+.vscode/
+.vs/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kiro local
+.kiro/cache/
+.kiro/logs/

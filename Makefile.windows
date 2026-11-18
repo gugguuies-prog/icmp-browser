@@ -1,0 +1,24 @@
+# Makefile pour Windows - Test ICMP.DLL
+# Compilateur: MinGW-w64 ou MSYS2
+
+CC=gcc
+CFLAGS=-Wall -O2
+LDFLAGS=-liphlpapi -lws2_32
+
+# Cibles
+all: test_icmp_dll.exe
+
+test_icmp_dll.exe: test_icmp_dll.c
+	$(CC) $(CFLAGS) test_icmp_dll.c -o test_icmp_dll.exe $(LDFLAGS)
+	@echo "=== Compilation réussie ==="
+	@echo "Exécutez: test_icmp_dll.exe [adresse_ip]"
+	@echo "Exemple: test_icmp_dll.exe 8.8.8.8"
+
+clean:
+	del /Q test_icmp_dll.exe 2>nul || echo "Déjà propre"
+
+test: test_icmp_dll.exe
+	@echo "=== Test avec 8.8.8.8 (Google DNS) ==="
+	test_icmp_dll.exe 8.8.8.8
+
+.PHONY: all clean test
