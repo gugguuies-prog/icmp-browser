@@ -36,14 +36,12 @@ HRESULT WebViewController::Initialize(std::function<void()> onInitialized)
 {
     m_onInitialized = onInitialized;
     
-    // Create WebView2 environment with proxy configuration
-    auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
+    // Set proxy via environment variable (simpler approach)
+    _wputenv(L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--proxy-server=http://127.0.0.1:8888");
     
-    // Configure proxy: all traffic through localhost:8888 (ICMP tunnel proxy)
-    options->put_AdditionalBrowserArguments(L"--proxy-server=http://127.0.0.1:8888 --ignore-certificate-errors");
-    
+    // Create WebView2 environment
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
-        nullptr, nullptr, options.Get(),
+        nullptr, nullptr, nullptr,
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
             [this](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
                 if (FAILED(result)) {
