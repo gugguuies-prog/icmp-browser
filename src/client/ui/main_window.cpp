@@ -13,8 +13,10 @@
 #include <string>
 #include <sstream>
 #include <commctrl.h>
+#include <wininet.h>
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "wininet.lib")
 
 // Window class name
 static const wchar_t* WINDOW_CLASS_NAME = L"ICMPBrowserWindow";
@@ -453,8 +455,31 @@ bool MainWindow::StartTunnel()
         return false;
     }
     
+    // Configure Windows system proxy to use localhost:8888
+    INTERNET_PER_CONN_OPTION_LIST list;
+    INTERNET_PER_CONN_OPTION options[2];
+    DWORD dwBufferSize = sizeof(list);
+    
+    // Enable proxy
+    options[0].dwOption = INTERNET_PER_CONN_FLAGS;
+    options[0].Value.dwValue = PROXY_TYPE_PROXY;
+    
+    // Set proxy server
+    options[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
+    options[1].Value.pszValue = L"http://127.0.0.1:8888";
+    
+    list.dwSize = sizeof(list);
+    list.pszConnection = nullptr; // LAN connection
+    list.dwOptionCount = 2;
+    list.dwOptionError = 0;
+    list.pOptions = options;
+    
+    InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufferSize);
+    InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0);
+    InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
+    
     m_tunnelActive = true;
-    UpdateStatus(L"ICMP tunnel active");
+    UpdateStatus(L"ICMP tunnel active + System proxy configured");
     
     return true;
 }
