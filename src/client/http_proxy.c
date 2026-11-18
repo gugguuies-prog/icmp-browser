@@ -321,31 +321,36 @@ static void* client_handler_thread(void *arg) {
         
         // If ICMP session available, tunnel the request
         if (proxy->icmp_session) {
-            // Encapsulate HTTP request as IP packet payload
-            // For now, just encapsulate the raw HTTP request
-            tunnel_packet_t tunnel_pkt;
-            memset(&tunnel_pkt, 0, sizeof(tunnel_pkt));
-            
-            tunnel_pkt.type = PACKET_TYPE_DATA;
-            tunnel_pkt.payload_size = (bytes_received > 1400) ? 1400 : bytes_received;
-            memcpy(tunnel_pkt.payload, buffer, tunnel_pkt.payload_size);
-            
-            // Encapsulate into ICMP
-            icmp_packet_t icmp_pkt;
+            // Encapsulate HTTP request as IP packet
+            // For now, send the raw HTTP request through the tunnel
             uint8_t session_key[32] = {0}; // TODO: Use real session key from handshake
+            proto_packet_t packets[10];
+            size_t packet_count = 0;
             
-            if (protocol_encapsulate(&tunnel_pkt, &icmp_pkt, 
-                                     proxy->icmp_session->session_id,
-                                     proxy->icmp_session->sequence_counter,
-                                     session_key) == 0) {
+            // Limit to 1400 bytes max
+            size_t data_size = (bytes_received > 1400) ? 1400 : bytes_received;
+            
+            if (proto_encapsulate(buffer, data_size, session_key,
+                                 proxy->icmp_session->session_id,
+                                 proxy->icmp_session->sequence_counter,
+                                 packets, &packet_count, 10) == PROTO_SUCCESS) {
                 
-                // Send via ICMP
-                if (icmp_send_packet(proxy->icmp_session, 
-                                    icmp_pkt.payload, 
-                                    icmp_pkt.payload_size) == 0) {
-                    
-                    printf("[HTTP Proxy] Sent request via ICMP tunnel (%zu bytes)\n",
-                           icmp_pkt.payload_size);
+                printf("[HTTP Proxy] Encapsulated into %zu ICMP packet(s)\n", packet_count);
+                
+                // Send all packets via ICMP
+                int sent_ok = 1;
+                for (size_t i = 0; i < packet_count; i++) {
+                    if (icmp_send_packet(proxy->icmp_session, 
+                                        packets[i].payload, 
+                                        packets[i].payload_size) != 0) {
+                        printf("[HTTP Proxy] Failed to send ICMP packet %zu\n", i);
+                        sent_ok = 0;
+                        break;
+                    }
+                }
+                
+                if (sent_ok) {
+                    printf("[HTTP Proxy] Sent %zu packet(s) via ICMP tunnel\n", packet_count);
                     
                     // Wait for ICMP reply with timeout
                     uint8_t reply_payload[2048];
@@ -355,19 +360,27 @@ static void* client_handler_thread(void *arg) {
                                        &reply_size, 5000) == 0) {
                         
                         // Decapsulate ICMP reply
-                        tunnel_packet_t reply_pkt;
-                        if (protocol_decapsulate(reply_payload, reply_size, 
-                                                &reply_pkt, session_key) == 0) {
+                        proto_packet_t reply_packet;
+                        memcpy(reply_packet.payload, reply_payload, reply_size);
+                        reply_packet.payload_size = reply_size;
+                        
+                        uint8_t decrypted_data[2048];
+                        size_t decrypted_size;
+                        
+                        if (proto_decapsulate(&reply_packet, session_key,
+                                             proxy->icmp_session->session_id,
+                                             proxy->icmp_session->sequence_counter - 1,
+                                             decrypted_data, &decrypted_size, 2048) == PROTO_SUCCESS) {
                             
-                            printf("[HTTP Proxy] Received reply via ICMP (%d bytes)\n",
-                                   reply_pkt.payload_size);
+                            printf("[HTTP Proxy] Received reply via ICMP (%zu bytes)\n",
+                                   decrypted_size);
                             
                             // Send HTTP response back to client
-                            send(client->socket_fd, (char*)reply_pkt.payload, 
-                                reply_pkt.payload_size, 0);
+                            send(client->socket_fd, (char*)decrypted_data, 
+                                (int)decrypted_size, 0);
                             
                             mutex_lock(&proxy->stats_lock);
-                            proxy->total_bytes_sent += reply_pkt.payload_size;
+                            proxy->total_bytes_sent += decrypted_size;
                             mutex_unlock(&proxy->stats_lock);
                             
                         } else {
@@ -376,12 +389,7 @@ static void* client_handler_thread(void *arg) {
                     } else {
                         printf("[HTTP Proxy] Timeout waiting for ICMP reply\n");
                     }
-                } else {
-                    printf("[HTTP Proxy] Failed to send ICMP packet\n");
                 }
-                
-                // Free ICMP packet payload
-                protocol_free_packet(&icmp_pkt);
             } else {
                 printf("[HTTP Proxy] Failed to encapsulate into ICMP\n");
             }
