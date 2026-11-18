@@ -181,7 +181,11 @@ if(BUILD_TESTS)
     
     # HTTP Proxy tests
     add_icmp_test(test_http_proxy tests/test_http_proxy.c
-                  src/client/http_proxy.c)
+                  src/client/http_proxy.c
+                  src/client/icmp_engine.c
+                  src/common/protocol.c
+                  src/crypto/aes_gcm.c
+                  src/crypto/diffie_hellman.c)
     
     # Platform-specific tests
     if(PLATFORM_WINDOWS)

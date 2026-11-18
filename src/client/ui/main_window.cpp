@@ -464,9 +464,9 @@ bool MainWindow::StartTunnel()
     options[0].dwOption = INTERNET_PER_CONN_FLAGS;
     options[0].Value.dwValue = PROXY_TYPE_PROXY;
     
-    // Set proxy server
+    // Set proxy server (use ANSI string for LPSTR)
     options[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
-    options[1].Value.pszValue = L"http://127.0.0.1:8888";
+    options[1].Value.pszValue = (LPSTR)"http://127.0.0.1:8888";
     
     list.dwSize = sizeof(list);
     list.pszConnection = nullptr; // LAN connection
