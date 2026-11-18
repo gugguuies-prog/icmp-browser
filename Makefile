@@ -43,6 +43,12 @@ SRC_CLIENT := src/client/icmp_engine.c src/client/http_proxy.c
 SRC_SERVER := src/server/icmp_handler.c src/server/session_manager.c src/server/tun_device.c
 SRC_COMMON := src/common/protocol.c src/common/handshake.c src/common/priority_queue.c src/common/compression.c src/common/statistics.c
 
+# Main programs
+SERVER_MAIN := src/server/main.c
+
+# Production server (includes all modules)
+SERVER_FULL := $(SERVER_MAIN) $(SRC_SERVER) $(SRC_COMMON) $(SRC_CRYPTO)
+
 # Test files
 TEST_AES_GCM := tests/test_aes_gcm.c
 TEST_DH := tests/test_dh.c
@@ -62,11 +68,36 @@ BUILD_DIR := build
 BIN_DIR := bin
 
 # Targets
-.PHONY: all clean test test-crypto help dirs
+.PHONY: all clean test test-crypto help dirs server
 
 all: dirs test-crypto-win
 
 dirs:
+	@mkdir -p $(BIN_DIR)
+	@mkdir -p $(BUILD_DIR)
+
+# ============================================================================
+# Production Server (Linux only)
+# ============================================================================
+server: dirs
+	@echo "========================================="
+	@echo " Building Production ICMP Server"
+	@echo "========================================="
+	@echo ""
+	@echo "📦 Compiling icmp_server..."
+	$(CC_LINUX) $(CFLAGS) $(SERVER_FULL) -o $(BIN_DIR)/icmp_server $(LDFLAGS_LINUX)
+	@echo ""
+	@echo "✅ Server built: $(BIN_DIR)/icmp_server"
+	@echo ""
+	@echo "🚀 To run:"
+	@echo "   sudo ./$(BIN_DIR)/icmp_server"
+	@echo ""
+	@echo "⚙️  Options:"
+	@echo "   -i <interface>  Network interface (default: eth0)"
+	@echo "   -v              Verbose logging"
+	@echo "   -h              Show help"
+	@echo ""
+
 	@mkdir -p $(BUILD_DIR) $(BIN_DIR)
 
 # Help target
@@ -75,6 +106,7 @@ help:
 	@echo "Platform detected: $(PLATFORM)"
 	@echo ""
 	@echo "Available targets:"
+	@echo "  make server                - Build production ICMP server (Linux)"
 	@echo "  make test-crypto-win       - Build and run AES-GCM tests (Windows)"
 	@echo "  make test-crypto-linux     - Build and run AES-GCM tests (Linux)"
 	@echo "  make test-dh-win           - Build and run DH tests (Windows)"
