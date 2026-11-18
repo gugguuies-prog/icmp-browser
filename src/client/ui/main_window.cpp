@@ -8,8 +8,8 @@
 #include "webview_controller.h"
 #include "status_bar.h"
 #include "settings_dialog.h"
+#include "../icmp_engine.h"      // Include BEFORE http_proxy.h (defines icmp_session_t)
 #include "../http_proxy.h"
-#include "../icmp_engine.h"
 #include <string>
 #include <sstream>
 #include <commctrl.h>

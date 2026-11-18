@@ -19,10 +19,10 @@
 #include "status_bar.h"
 #include "settings_dialog.h"
 
-// Forward declarations
+// Forward declarations (must match typedefs in source headers)
 class WebViewController;
-struct http_proxy_t;
-struct icmp_session_t;
+typedef struct http_proxy_s http_proxy_t;
+typedef struct icmp_session_s icmp_session_t;
 
 class MainWindow {
 public:
