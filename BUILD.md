@@ -364,3 +364,33 @@ valgrind --leak-check=full ./icmpbrowser
 ---
 
 **Dernière mise à jour:** 2024-11-17
+
+
+
+## 🚨 ÉTAT ACTUEL (2024-11-18)
+
+**WebView2 :** ✅ Installé via vcpkg  
+**CMake Config :** ✅ Succès (OpenSSL 3.6.5, zlib 1.4, WebView2)  
+**Compilation :** ❌ Bloquée par incompatibilités Windows/Linux
+
+**Problèmes:**
+1. `pthread.h` n'existe pas sur Windows → Nécessite threads portables
+2. Erreurs de syntaxe dans `protocol.h` (structures packed, MSVC vs GCC)
+3. Conflits possibles dans `compression.c`
+
+**Voir `SESSION_4_COMPILATION.md` pour détails et solutions.**
+
+### Compilation sur VM Windows (Bloquée actuellement)
+
+```cmd
+cd C:\icmp-browser\build-vm
+
+# Configuration CMake (fonctionne ✅)
+cmake .. -G "Visual Studio 18 2026" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+# Compilation (échoue actuellement ❌ - code nécessite adaptations Windows)
+cmake --build . --config Release
+```
+
+**Note:** Le code nécessite 6-9h d'adaptations pour Windows (threads portables, structures, etc.).  
+Alternative : Focus sur serveur Linux qui fonctionne déjà parfaitement (94 tests ✅).

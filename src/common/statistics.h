@@ -16,7 +16,7 @@
 
 #include <stdint.h>
 #include <time.h>
-#include <pthread.h>
+#include "thread_compat.h"
 
 // Error codes
 #define STATS_SUCCESS 0
@@ -51,7 +51,7 @@ typedef struct {
     uint32_t max_consecutive_losses;     // Max consecutive losses seen
     
     // Thread safety
-    pthread_mutex_t lock;
+    mutex_t lock;
     
 } statistics_t;
 

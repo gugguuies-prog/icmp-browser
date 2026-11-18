@@ -18,7 +18,7 @@
 #endif
 
 #include <stdint.h>
-#include <pthread.h>
+#include "../common/thread_compat.h"
 
 // Forward declaration - ICMP session will be fully defined when integrated
 typedef struct icmp_session_s icmp_session_t;
@@ -92,10 +92,10 @@ struct http_proxy_s {
     pthread_t accept_thread;        // Accept thread
     http_client_t *clients;         // Client connections array
     size_t max_clients;             // Maximum concurrent clients
-    pthread_mutex_t clients_lock;   // Mutex for clients array
+    mutex_t clients_lock;           // Mutex for clients array
     icmp_session_t *icmp_session;   // ICMP tunnel session
     uint32_t next_connection_id;    // Next connection ID
-    pthread_mutex_t stats_lock;     // Statistics mutex
+    mutex_t stats_lock;             // Statistics mutex
     uint64_t total_requests;        // Total requests handled
     uint64_t total_bytes_sent;      // Total bytes sent to clients
     uint64_t total_bytes_received;  // Total bytes received from clients

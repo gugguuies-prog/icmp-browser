@@ -21,7 +21,7 @@ int session_manager_init(session_manager_t *manager) {
     memset(manager->sessions, 0, sizeof(manager->sessions));
     
     // Initialize mutex
-    if (pthread_mutex_init(&manager->lock, NULL) != 0) {
+    if (mutex_init(&manager->lock) != 0) {
         return SESSION_ERROR_INVALID_PARAM;
     }
     
@@ -39,13 +39,13 @@ int session_manager_create(session_manager_t *manager, uint16_t session_id,
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Check if session already exists
     for (size_t i = 0; i < SESSION_MAX_SESSIONS; i++) {
         if (manager->sessions[i].active && 
             manager->sessions[i].session_id == session_id) {
-            pthread_mutex_unlock(&manager->lock);
+            mutex_unlock(&manager->lock);
             return SESSION_ERROR_ALREADY_EXISTS;
         }
     }
@@ -60,7 +60,7 @@ int session_manager_create(session_manager_t *manager, uint16_t session_id,
     }
     
     if (slot == -1) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_TABLE_FULL;
     }
     
@@ -78,7 +78,7 @@ int session_manager_create(session_manager_t *manager, uint16_t session_id,
     
     manager->active_count++;
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -92,7 +92,7 @@ int session_manager_set_key(session_manager_t *manager, uint16_t session_id,
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Find session
     session_entry_t *session = NULL;
@@ -105,7 +105,7 @@ int session_manager_set_key(session_manager_t *manager, uint16_t session_id,
     }
     
     if (!session) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_NOT_FOUND;
     }
     
@@ -115,7 +115,7 @@ int session_manager_set_key(session_manager_t *manager, uint16_t session_id,
     session->state = SESSION_STATE_ACTIVE;
     session->last_activity = time(NULL);
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -129,7 +129,7 @@ int session_manager_get_key(session_manager_t *manager, uint16_t session_id,
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Find session
     session_entry_t *session = NULL;
@@ -142,19 +142,19 @@ int session_manager_get_key(session_manager_t *manager, uint16_t session_id,
     }
     
     if (!session) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_NOT_FOUND;
     }
     
     if (!session->key_established) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_NOT_FOUND;
     }
     
     // Get key
     memcpy(session_key, session->session_key, 32);
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -169,7 +169,7 @@ int session_manager_find_by_addr(session_manager_t *manager,
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Find session by IP address and port
     for (size_t i = 0; i < SESSION_MAX_SESSIONS; i++) {
@@ -178,13 +178,13 @@ int session_manager_find_by_addr(session_manager_t *manager,
             if (session->client_addr.sin_addr.s_addr == client_addr->sin_addr.s_addr &&
                 session->client_addr.sin_port == client_addr->sin_port) {
                 *session_id = session->session_id;
-                pthread_mutex_unlock(&manager->lock);
+                mutex_unlock(&manager->lock);
                 return SESSION_SUCCESS;
             }
         }
     }
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     return SESSION_ERROR_NOT_FOUND;
 }
 
@@ -196,7 +196,7 @@ int session_manager_update_activity(session_manager_t *manager, uint16_t session
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Find session
     session_entry_t *session = NULL;
@@ -209,14 +209,14 @@ int session_manager_update_activity(session_manager_t *manager, uint16_t session
     }
     
     if (!session) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_NOT_FOUND;
     }
     
     // Update last activity
     session->last_activity = time(NULL);
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -231,7 +231,7 @@ int session_manager_update_stats(session_manager_t *manager, uint16_t session_id
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Find session
     session_entry_t *session = NULL;
@@ -244,7 +244,7 @@ int session_manager_update_stats(session_manager_t *manager, uint16_t session_id
     }
     
     if (!session) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_NOT_FOUND;
     }
     
@@ -254,7 +254,7 @@ int session_manager_update_stats(session_manager_t *manager, uint16_t session_id
     session->bytes_received += bytes_received;
     session->bytes_sent += bytes_sent;
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -268,7 +268,7 @@ int session_manager_get_info(session_manager_t *manager, uint16_t session_id,
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Find session
     session_entry_t *session = NULL;
@@ -281,14 +281,14 @@ int session_manager_get_info(session_manager_t *manager, uint16_t session_id,
     }
     
     if (!session) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_NOT_FOUND;
     }
     
     // Copy session info (but NOT the key for security)
     memcpy(entry, session, sizeof(session_entry_t));
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -302,7 +302,7 @@ int session_manager_get_all(session_manager_t *manager, session_entry_t *session
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     size_t n = 0;
     for (size_t i = 0; i < SESSION_MAX_SESSIONS && n < max_sessions; i++) {
@@ -314,7 +314,7 @@ int session_manager_get_all(session_manager_t *manager, session_entry_t *session
     
     *count = n;
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -327,7 +327,7 @@ int session_manager_remove(session_manager_t *manager, uint16_t session_id) {
         return SESSION_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Find session
     session_entry_t *session = NULL;
@@ -340,7 +340,7 @@ int session_manager_remove(session_manager_t *manager, uint16_t session_id) {
     }
     
     if (!session) {
-        pthread_mutex_unlock(&manager->lock);
+        mutex_unlock(&manager->lock);
         return SESSION_ERROR_NOT_FOUND;
     }
     
@@ -353,7 +353,7 @@ int session_manager_remove(session_manager_t *manager, uint16_t session_id) {
     
     manager->active_count--;
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return SESSION_SUCCESS;
 }
@@ -366,7 +366,7 @@ int session_manager_cleanup(session_manager_t *manager) {
         return 0;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     time_t now = time(NULL);
     int removed = 0;
@@ -390,7 +390,7 @@ int session_manager_cleanup(session_manager_t *manager) {
         }
     }
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return removed;
 }
@@ -403,9 +403,9 @@ int session_manager_count(session_manager_t *manager) {
         return 0;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     int count = manager->active_count;
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     return count;
 }
@@ -418,7 +418,7 @@ void session_manager_destroy(session_manager_t *manager) {
         return;
     }
     
-    pthread_mutex_lock(&manager->lock);
+    mutex_lock(&manager->lock);
     
     // Securely wipe all session keys
     for (size_t i = 0; i < SESSION_MAX_SESSIONS; i++) {
@@ -431,10 +431,10 @@ void session_manager_destroy(session_manager_t *manager) {
     
     manager->active_count = 0;
     
-    pthread_mutex_unlock(&manager->lock);
+    mutex_unlock(&manager->lock);
     
     // Destroy mutex
-    pthread_mutex_destroy(&manager->lock);
+    mutex_destroy(&manager->lock);
 }
 
 /**

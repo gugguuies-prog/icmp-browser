@@ -18,7 +18,7 @@
 #include <stddef.h>
 #include <time.h>
 #include <netinet/in.h>
-#include <pthread.h>
+#include "../common/thread_compat.h"
 
 // Constants
 #define SESSION_MAX_SESSIONS 256         // Maximum concurrent sessions
@@ -77,7 +77,7 @@ typedef struct {
  */
 typedef struct {
     session_entry_t sessions[SESSION_MAX_SESSIONS];  // Session table
-    pthread_mutex_t lock;                            // Thread-safe lock
+    mutex_t lock;                                    // Thread-safe lock
     uint32_t active_count;                           // Number of active sessions
 } session_manager_t;
 

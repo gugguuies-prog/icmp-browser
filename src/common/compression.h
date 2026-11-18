@@ -15,7 +15,14 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <sys/types.h>
+
+/* Portable ssize_t definition */
+#ifdef _WIN32
+  #include <BaseTsd.h>
+  typedef SSIZE_T ssize_t;
+#else
+  #include <sys/types.h>
+#endif
 
 // Compression levels
 #define COMPRESS_LEVEL_NONE 0            // No compression

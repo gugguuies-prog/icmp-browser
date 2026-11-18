@@ -63,13 +63,23 @@
 /**
  * Protocol header structure
  */
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
 typedef struct {
     uint8_t type;                        // Packet type
     uint8_t flags;                       // Packet flags
     uint16_t fragment_id;                // Fragment ID (for reassembly)
     uint16_t fragment_num;               // Fragment number (0-based)
     uint16_t total_fragments;            // Total number of fragments
-} __attribute__((packed)) proto_header_t;
+}
+#ifndef _MSC_VER
+__attribute__((packed))
+#endif
+proto_header_t;
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 /**
  * Protocol packet structure

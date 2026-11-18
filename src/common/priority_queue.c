@@ -37,7 +37,7 @@ priority_queue_t* pq_create(size_t capacity) {
     pq->count = 0;
     pq->sequence_counter = 0;
     
-    if (pthread_mutex_init(&pq->lock, NULL) != 0) {
+    if (mutex_init(&pq->lock) != 0) {
         free(pq->entries);
         free(pq);
         return NULL;
@@ -59,19 +59,19 @@ int pq_enqueue(priority_queue_t *pq, const uint8_t *packet, size_t packet_size,
         return PQ_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     
     // Check if queue is full
     if (pq->count >= pq->capacity) {
         pq->dropped++;
-        pthread_mutex_unlock(&pq->lock);
+        mutex_unlock(&pq->lock);
         return PQ_ERROR_FULL;
     }
     
     // Allocate and copy packet data
     uint8_t *data = (uint8_t*)malloc(packet_size);
     if (!data) {
-        pthread_mutex_unlock(&pq->lock);
+        mutex_unlock(&pq->lock);
         return PQ_ERROR_MEMORY;
     }
     memcpy(data, packet, packet_size);
@@ -87,7 +87,7 @@ int pq_enqueue(priority_queue_t *pq, const uint8_t *packet, size_t packet_size,
     pq->total_enqueued++;
     pq->enqueued_by_priority[priority]++;
     
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return PQ_SUCCESS;
 }
@@ -131,10 +131,10 @@ int pq_dequeue(priority_queue_t *pq, uint8_t **packet, size_t *packet_size,
         return PQ_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     
     if (pq->count == 0) {
-        pthread_mutex_unlock(&pq->lock);
+        mutex_unlock(&pq->lock);
         return PQ_ERROR_EMPTY;
     }
     
@@ -161,7 +161,7 @@ int pq_dequeue(priority_queue_t *pq, uint8_t **packet, size_t *packet_size,
     
     pq->count--;
     
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return PQ_SUCCESS;
 }
@@ -175,10 +175,10 @@ const uint8_t* pq_peek(priority_queue_t *pq, size_t *packet_size,
         return NULL;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     
     if (pq->count == 0) {
-        pthread_mutex_unlock(&pq->lock);
+        mutex_unlock(&pq->lock);
         return NULL;
     }
     
@@ -194,7 +194,7 @@ const uint8_t* pq_peek(priority_queue_t *pq, size_t *packet_size,
     
     const uint8_t *data = entry->data;
     
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return data;
 }
@@ -207,9 +207,9 @@ size_t pq_size(priority_queue_t *pq) {
         return 0;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     size_t count = pq->count;
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return count;
 }
@@ -229,9 +229,9 @@ int pq_is_full(priority_queue_t *pq) {
         return 1;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     int full = (pq->count >= pq->capacity);
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return full;
 }
@@ -244,7 +244,7 @@ size_t pq_clear(priority_queue_t *pq) {
         return 0;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     
     // Free all packet data
     for (size_t i = 0; i < pq->count; i++) {
@@ -257,7 +257,7 @@ size_t pq_clear(priority_queue_t *pq) {
     size_t cleared = pq->count;
     pq->count = 0;
     
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return cleared;
 }
@@ -271,7 +271,7 @@ int pq_get_stats(priority_queue_t *pq, uint64_t *total_enqueued,
         return PQ_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     
     if (total_enqueued) {
         *total_enqueued = pq->total_enqueued;
@@ -283,7 +283,7 @@ int pq_get_stats(priority_queue_t *pq, uint64_t *total_enqueued,
         *dropped = pq->dropped;
     }
     
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return PQ_SUCCESS;
 }
@@ -297,7 +297,7 @@ int pq_get_priority_stats(priority_queue_t *pq, priority_level_t priority,
         return PQ_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&pq->lock);
+    mutex_lock(&pq->lock);
     
     if (enqueued) {
         *enqueued = pq->enqueued_by_priority[priority];
@@ -306,7 +306,7 @@ int pq_get_priority_stats(priority_queue_t *pq, priority_level_t priority,
         *dequeued = pq->dequeued_by_priority[priority];
     }
     
-    pthread_mutex_unlock(&pq->lock);
+    mutex_unlock(&pq->lock);
     
     return PQ_SUCCESS;
 }
@@ -327,7 +327,7 @@ void pq_destroy(priority_queue_t *pq) {
         free(pq->entries);
     }
     
-    pthread_mutex_destroy(&pq->lock);
+    mutex_destroy(&pq->lock);
     
     free(pq);
 }

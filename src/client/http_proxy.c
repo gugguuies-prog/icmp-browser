@@ -67,14 +67,14 @@ http_proxy_t* http_proxy_create(uint16_t port, icmp_session_t *icmp_session) {
     }
     
     // Initialize mutexes
-    if (pthread_mutex_init(&proxy->clients_lock, NULL) != 0) {
+    if (mutex_init(&proxy->clients_lock) != 0) {
         free(proxy->clients);
         free(proxy);
         return NULL;
     }
     
-    if (pthread_mutex_init(&proxy->stats_lock, NULL) != 0) {
-        pthread_mutex_destroy(&proxy->clients_lock);
+    if (mutex_init(&proxy->stats_lock) != 0) {
+        mutex_destroy(&proxy->clients_lock);
         free(proxy->clients);
         free(proxy);
         return NULL;
@@ -154,7 +154,7 @@ void http_proxy_stop(http_proxy_t *proxy) {
     pthread_join(proxy->accept_thread, NULL);
     
     // Close all client connections
-    pthread_mutex_lock(&proxy->clients_lock);
+    mutex_lock(&proxy->clients_lock);
     for (size_t i = 0; i < proxy->max_clients; i++) {
         if (proxy->clients[i].active) {
             if (proxy->clients[i].socket_fd >= 0) {
@@ -165,7 +165,7 @@ void http_proxy_stop(http_proxy_t *proxy) {
             proxy->clients[i].active = 0;
         }
     }
-    pthread_mutex_unlock(&proxy->clients_lock);
+    mutex_unlock(&proxy->clients_lock);
     
     printf("[HTTP Proxy] Stopped\n");
 }
@@ -180,8 +180,8 @@ void http_proxy_destroy(http_proxy_t *proxy) {
     
     http_proxy_stop(proxy);
     
-    pthread_mutex_destroy(&proxy->clients_lock);
-    pthread_mutex_destroy(&proxy->stats_lock);
+    mutex_destroy(&proxy->clients_lock);
+    mutex_destroy(&proxy->stats_lock);
     
     free(proxy->clients);
     free(proxy);
@@ -213,7 +213,7 @@ static void* accept_thread_func(void *arg) {
         }
         
         // Find free slot for client
-        pthread_mutex_lock(&proxy->clients_lock);
+        mutex_lock(&proxy->clients_lock);
         
         http_client_t *client = NULL;
         for (size_t i = 0; i < proxy->max_clients; i++) {
@@ -225,7 +225,7 @@ static void* accept_thread_func(void *arg) {
         
         if (!client) {
             // No free slots
-            pthread_mutex_unlock(&proxy->clients_lock);
+            mutex_unlock(&proxy->clients_lock);
             close(client_socket);
             printf("[HTTP Proxy] Max connections reached, rejected client\n");
             continue;
@@ -243,12 +243,12 @@ static void* accept_thread_func(void *arg) {
         if (pthread_create(&client->thread, NULL, client_handler_thread, client) != 0) {
             close(client_socket);
             client->active = 0;
-            pthread_mutex_unlock(&proxy->clients_lock);
+            mutex_unlock(&proxy->clients_lock);
             printf("[HTTP Proxy] Failed to create client thread\n");
             continue;
         }
         
-        pthread_mutex_unlock(&proxy->clients_lock);
+        mutex_unlock(&proxy->clients_lock);
         
         printf("[HTTP Proxy] Client connected: %s (ID %u)\n",
                inet_ntoa(client_addr.sin_addr), client->connection_id);
@@ -288,10 +288,10 @@ static void* client_handler_thread(void *arg) {
         // TODO: Send response to client
         
         // Update statistics
-        pthread_mutex_lock(&proxy->stats_lock);
+        mutex_lock(&proxy->stats_lock);
         proxy->total_requests++;
         proxy->total_bytes_received += bytes_received;
-        pthread_mutex_unlock(&proxy->stats_lock);
+        mutex_unlock(&proxy->stats_lock);
         
         // For now, send a simple response
         const char *response = 
@@ -305,9 +305,9 @@ static void* client_handler_thread(void *arg) {
         send(client->socket_fd, response, (int)strlen(response), 0);
         
         // Update statistics
-        pthread_mutex_lock(&proxy->stats_lock);
+        mutex_lock(&proxy->stats_lock);
         proxy->total_bytes_sent += strlen(response);
-        pthread_mutex_unlock(&proxy->stats_lock);
+        mutex_unlock(&proxy->stats_lock);
         
         break; // Close connection after response
     }
@@ -492,14 +492,14 @@ void http_proxy_get_stats(http_proxy_t *proxy, uint64_t *total_requests,
         return;
     }
     
-    pthread_mutex_lock(&proxy->stats_lock);
+    mutex_lock(&proxy->stats_lock);
     if (total_requests) *total_requests = proxy->total_requests;
     if (total_bytes_sent) *total_bytes_sent = proxy->total_bytes_sent;
     if (total_bytes_received) *total_bytes_received = proxy->total_bytes_received;
-    pthread_mutex_unlock(&proxy->stats_lock);
+    mutex_unlock(&proxy->stats_lock);
     
     if (active_connections) {
-        pthread_mutex_lock(&proxy->clients_lock);
+        mutex_lock(&proxy->clients_lock);
         int count = 0;
         for (size_t i = 0; i < proxy->max_clients; i++) {
             if (proxy->clients[i].active) {
@@ -507,7 +507,7 @@ void http_proxy_get_stats(http_proxy_t *proxy, uint64_t *total_requests,
             }
         }
         *active_connections = count;
-        pthread_mutex_unlock(&proxy->clients_lock);
+        mutex_unlock(&proxy->clients_lock);
     }
 }
 

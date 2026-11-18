@@ -22,7 +22,7 @@
 #include <stddef.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <pthread.h>
+#include "../common/thread_compat.h"
 
 // Constants
 #define ICMP_MTU 1472                    // Maximum payload size (1500 - 20 IP - 8 ICMP)
@@ -87,7 +87,7 @@ typedef struct {
     
     // Session table
     icmp_session_info_t sessions[ICMP_MAX_SESSIONS];
-    pthread_mutex_t sessions_lock;       // Lock for session table
+    mutex_t sessions_lock;           // Lock for session table
     
     // Receive buffer
     uint8_t recv_buffer[ICMP_RECV_BUFFER_SIZE];

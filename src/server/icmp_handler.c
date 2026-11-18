@@ -46,7 +46,7 @@ uint16_t icmp_checksum(const uint8_t *data, size_t len) {
 static icmp_session_info_t* find_or_create_session(icmp_server_t *server,
                                                      const struct sockaddr_in *client_addr,
                                                      uint16_t session_id) {
-    pthread_mutex_lock(&server->sessions_lock);
+    mutex_lock(&server->sessions_lock);
     
     time_t now = time(NULL);
     icmp_session_info_t *session = NULL;
@@ -77,7 +77,7 @@ static icmp_session_info_t* find_or_create_session(icmp_server_t *server,
         session->active = 1;
     }
     
-    pthread_mutex_unlock(&server->sessions_lock);
+    mutex_unlock(&server->sessions_lock);
     
     return session;
 }
@@ -99,7 +99,7 @@ icmp_server_t* icmp_server_create(void) {
     }
     
     // Initialize mutex
-    if (pthread_mutex_init(&server->sessions_lock, NULL) != 0) {
+    if (mutex_init(&server->sessions_lock) != 0) {
         close(server->raw_socket);
         free(server);
         return NULL;
@@ -307,17 +307,17 @@ int icmp_get_session(icmp_server_t *server, uint16_t session_id,
         return ICMP_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&server->sessions_lock);
+    mutex_lock(&server->sessions_lock);
     
     for (int i = 0; i < ICMP_MAX_SESSIONS; i++) {
         if (server->sessions[i].active && server->sessions[i].session_id == session_id) {
             *session_info = server->sessions[i];
-            pthread_mutex_unlock(&server->sessions_lock);
+            mutex_unlock(&server->sessions_lock);
             return ICMP_SUCCESS;
         }
     }
     
-    pthread_mutex_unlock(&server->sessions_lock);
+    mutex_unlock(&server->sessions_lock);
     return ICMP_ERROR_SESSION_NOT_FOUND;
 }
 
@@ -330,7 +330,7 @@ int icmp_get_all_sessions(icmp_server_t *server, icmp_session_info_t *sessions,
         return ICMP_ERROR_INVALID_PARAM;
     }
     
-    pthread_mutex_lock(&server->sessions_lock);
+    mutex_lock(&server->sessions_lock);
     
     *count = 0;
     for (int i = 0; i < ICMP_MAX_SESSIONS; i++) {
@@ -340,7 +340,7 @@ int icmp_get_all_sessions(icmp_server_t *server, icmp_session_info_t *sessions,
         }
     }
     
-    pthread_mutex_unlock(&server->sessions_lock);
+    mutex_unlock(&server->sessions_lock);
     return ICMP_SUCCESS;
 }
 
@@ -352,7 +352,7 @@ int icmp_cleanup_sessions(icmp_server_t *server) {
         return 0;
     }
     
-    pthread_mutex_lock(&server->sessions_lock);
+    mutex_lock(&server->sessions_lock);
     
     time_t now = time(NULL);
     int removed = 0;
@@ -366,7 +366,7 @@ int icmp_cleanup_sessions(icmp_server_t *server) {
         }
     }
     
-    pthread_mutex_unlock(&server->sessions_lock);
+    mutex_unlock(&server->sessions_lock);
     
     return removed;
 }
@@ -405,7 +405,7 @@ int icmp_server_destroy(icmp_server_t *server) {
     }
     
     // Destroy mutex
-    pthread_mutex_destroy(&server->sessions_lock);
+    mutex_destroy(&server->sessions_lock);
     
     // Free memory
     memset(server, 0, sizeof(icmp_server_t));

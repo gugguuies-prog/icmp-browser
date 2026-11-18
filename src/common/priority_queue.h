@@ -15,7 +15,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <pthread.h>
+#include "thread_compat.h"
 
 // Constants
 #define PQ_MAX_CAPACITY 10000            // Maximum queue capacity
@@ -62,7 +62,7 @@ typedef struct {
     uint64_t dequeued_by_priority[PRIORITY_COUNT];
     uint64_t dropped;                    // Dropped due to full queue
     
-    pthread_mutex_t lock;                // Thread-safe lock
+    mutex_t lock;                        // Thread-safe lock
 } priority_queue_t;
 
 /**
