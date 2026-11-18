@@ -85,11 +85,13 @@ int main(int argc, char *argv[]) {
     
     // Create ICMP server
     printf("[Server] Creating ICMP server...\n");
-    g_server = icmp_server_create(interface);
+    g_server = icmp_server_create();
     if (!g_server) {
         fprintf(stderr, "[Error] Failed to create ICMP server\n");
         return 1;
     }
+    
+    printf("[Server] Note: Interface parameter '%s' will be used in future versions\n", interface);
     
     // Start server
     printf("[Server] Starting ICMP server...\n");
