@@ -14,6 +14,10 @@
 #ifndef ICMP_ENGINE_H
 #define ICMP_ENGINE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
@@ -239,5 +243,9 @@ const char* icmp_error_string(int error_code);
  * Note: Useful for debugging IcmpSendEcho failures
  */
 const char* icmp_get_last_windows_error();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // ICMP_ENGINE_H

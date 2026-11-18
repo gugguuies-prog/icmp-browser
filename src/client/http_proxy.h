@@ -8,6 +8,10 @@
 #ifndef HTTP_PROXY_H
 #define HTTP_PROXY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -187,5 +191,9 @@ void http_proxy_get_stats(http_proxy_t *proxy, uint64_t *total_requests,
  * @param proxy Proxy context
  */
 void http_proxy_print_stats(http_proxy_t *proxy);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* HTTP_PROXY_H */
