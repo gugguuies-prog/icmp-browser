@@ -13,6 +13,8 @@
 #ifdef _WIN32
 #define close closesocket
 #define SHUT_RDWR SD_BOTH
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
 #else
 #include <unistd.h>
 #include <errno.h>
@@ -122,7 +124,7 @@ int http_proxy_start(http_proxy_t *proxy) {
     
     // Start accept thread
     proxy->running = 1;
-    if (pthread_create(&proxy->accept_thread, NULL, accept_thread_func, proxy) != 0) {
+    if (thread_create(&proxy->accept_thread, (thread_func_t)accept_thread_func, proxy) != 0) {
         proxy->running = 0;
         close(proxy->listen_socket);
         return HTTP_PROXY_ERROR_THREAD;
@@ -151,7 +153,7 @@ void http_proxy_stop(http_proxy_t *proxy) {
     }
     
     // Wait for accept thread
-    pthread_join(proxy->accept_thread, NULL);
+    thread_join(proxy->accept_thread);
     
     // Close all client connections
     mutex_lock(&proxy->clients_lock);

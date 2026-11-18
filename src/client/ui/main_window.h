@@ -8,6 +8,12 @@
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
 
+// Include winsock2 BEFORE windows.h to avoid conflicts
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
+
 #include <windows.h>
 #include <string>
 #include "status_bar.h"

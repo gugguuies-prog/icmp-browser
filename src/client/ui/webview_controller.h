@@ -8,10 +8,27 @@
 #ifndef WEBVIEW_CONTROLLER_H
 #define WEBVIEW_CONTROLLER_H
 
+/**
+ * webview_controller.h
+ * 
+ * WebView2 Controller for ICMP Browser
+ * Manages Microsoft Edge WebView2 control
+ */
+
+#ifndef WEBVIEW_CONTROLLER_H
+#define WEBVIEW_CONTROLLER_H
+
+// Include winsock2 BEFORE windows.h to avoid conflicts
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
+
 #include <windows.h>
 #include <wrl.h>
 #include <wil/com.h>
 #include <string>
+#include <functional>
 #include "WebView2.h"
 
 using namespace Microsoft::WRL;
