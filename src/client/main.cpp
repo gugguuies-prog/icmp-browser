@@ -5,6 +5,9 @@
  * Windows application using WebView2 for browsing via ICMP tunnel
  */
 
+// IMPORTANT: winsock2.h MUST be included BEFORE windows.h
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <string>
 #include "ui/main_window.h"

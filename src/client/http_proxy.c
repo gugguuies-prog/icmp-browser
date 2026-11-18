@@ -163,7 +163,7 @@ void http_proxy_stop(http_proxy_t *proxy) {
                 shutdown(proxy->clients[i].socket_fd, SHUT_RDWR);
                 close(proxy->clients[i].socket_fd);
             }
-            pthread_join(proxy->clients[i].thread, NULL);
+            thread_join(proxy->clients[i].thread);
             proxy->clients[i].active = 0;
         }
     }
@@ -242,7 +242,7 @@ static void* accept_thread_func(void *arg) {
         client->proxy = proxy;  // Set proxy pointer
         
         // Start client handler thread
-        if (pthread_create(&client->thread, NULL, client_handler_thread, client) != 0) {
+        if (thread_create(&client->thread, client_handler_thread, client) != 0) {
             close(client_socket);
             client->active = 0;
             mutex_unlock(&proxy->clients_lock);
