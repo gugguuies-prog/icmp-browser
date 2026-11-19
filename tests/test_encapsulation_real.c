@@ -329,10 +329,14 @@ int send_http_request(icmp_session_t *icmp_session,
     proto_packet_t packets[10];  // Support pour fragmentation
     size_t packet_count;
     
+    // IMPORTANT: Use data sequence counter starting at 0 (separate from ICMP sequence)
+    // This matches the server's data_sequence_counter initialization
+    static uint16_t data_sequence = 0;
+    
     int result = proto_encapsulate(ip_packet, ip_size,
                                     session_key,
                                     icmp_session->session_id,
-                                    icmp_session->sequence_counter,
+                                    data_sequence,  // Use data sequence, not ICMP sequence
                                     packets, &packet_count, 10);
     
     if (result != PROTO_SUCCESS) {
@@ -367,6 +371,9 @@ int send_http_request(icmp_session_t *icmp_session,
         
         printf("%s[✓]%s Fragment %zu envoyé\n", COLOR_GREEN, COLOR_RESET, i + 1);
     }
+    
+    // Increment data sequence after successful send
+    data_sequence++;
     
     return 0;
 }
