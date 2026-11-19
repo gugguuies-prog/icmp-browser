@@ -191,6 +191,12 @@ if(BUILD_TESTS)
     if(PLATFORM_WINDOWS)
         add_icmp_test(test_icmp_engine tests/test_icmp_engine.c
                       src/client/icmp_engine.c)
+        
+        # Test d'encapsulation réelle (requête HTTP via ICMP)
+        add_icmp_test(test_encapsulation_real tests/test_encapsulation_real.c
+                      src/client/icmp_engine.c
+                      ${COMMON_SOURCES}
+                      ${CRYPTO_SOURCES})
     endif()
     
     if(PLATFORM_LINUX)
