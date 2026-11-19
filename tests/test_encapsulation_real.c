@@ -73,6 +73,33 @@ uint16_t calculate_checksum(uint16_t *addr, int len) {
 size_t create_http_get_packet(const char *host, const char *path, 
                                const char *src_ip, const char *dst_ip,
                                uint8_t *buffer, size_t max_size) {
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+    struct iphdr {
+        uint8_t version_ihl;      // Version (4 bits) + IHL (4 bits)
+        uint8_t tos;              // Type of service
+        uint16_t tot_len;         // Total length
+        uint16_t id;              // Identification
+        uint16_t frag_off;        // Fragment offset
+        uint8_t ttl;              // Time to live
+        uint8_t protocol;         // Protocol
+        uint16_t check;           // Checksum
+        uint32_t saddr;           // Source address
+        uint32_t daddr;           // Destination address
+    };
+
+    struct tcphdr {
+        uint16_t source;          // Source port
+        uint16_t dest;            // Destination port
+        uint32_t seq;             // Sequence number
+        uint32_t ack_seq;         // Acknowledgment number
+        uint16_t res1_doff_flags; // Data offset + flags
+        uint16_t window;          // Window size
+        uint16_t check;           // Checksum
+        uint16_t urg_ptr;         // Urgent pointer
+    };
+#pragma pack(pop)
+#else
     struct iphdr {
         uint8_t version_ihl;      // Version (4 bits) + IHL (4 bits)
         uint8_t tos;              // Type of service
@@ -96,6 +123,7 @@ size_t create_http_get_packet(const char *host, const char *path,
         uint16_t check;           // Checksum
         uint16_t urg_ptr;         // Urgent pointer
     } __attribute__((packed));
+#endif
 
     // Construire la requête HTTP
     char http_request[1024];
