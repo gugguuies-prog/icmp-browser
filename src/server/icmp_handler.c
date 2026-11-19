@@ -148,27 +148,29 @@ static int handle_handshake(icmp_server_t *server, icmp_session_info_t *session,
  * Handle data packet (encrypted IP packet)
  */
 static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *session,
-                               const proto_packet_t *packet,
+                               const proto_packet_t *packet, uint16_t icmp_sequence,
                                const struct sockaddr_in *client_addr) {
     if (!session->handshake_complete) {
         LOG_VERBOSE("[Server] Received DATA before handshake complete\n");
         return -1;
     }
     
-    LOG_VERBOSE("[Server] Processing DATA packet for session 0x%04x (seq=%d)\n", 
-                session->session_id, packet->header.fragment_num);
+    LOG_VERBOSE("[Server] Processing DATA packet for session 0x%04x (ICMP seq=%d, frag_num=%d)\n", 
+                session->session_id, icmp_sequence, packet->header.fragment_num);
     
     // Decapsulate (decrypt) the packet
+    // IMPORTANT: Use the ICMP sequence number for AAD, not fragment_num
     uint8_t decrypted[2048];
     size_t decrypted_size;
     
     int result = proto_decapsulate(packet, session->session_key,
                                     session->session_id,
-                                    packet->header.fragment_num,
+                                    icmp_sequence,  // Use ICMP sequence, not fragment_num
                                     decrypted, &decrypted_size, sizeof(decrypted));
     
     if (result != PROTO_SUCCESS) {
         LOG_VERBOSE("[Server] Decapsulation failed: %s\n", proto_error_string(result));
+        LOG_VERBOSE("[Server] Debug: session_id=0x%04x, icmp_seq=%d\n", session->session_id, icmp_sequence);
         return -1;
     }
     
@@ -184,7 +186,7 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     result = proto_encapsulate(decrypted, decrypted_size,
                                session->session_key,
                                session->session_id,
-                               packet->header.fragment_num + 1,
+                               icmp_sequence + 1,  // Response uses next sequence
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
@@ -196,7 +198,7 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
         size_t total_size = 8 + resp->payload_size;
         
         icmp_send_reply(server, client_addr, session->session_id, 
-                       packet->header.fragment_num, reply_payload, total_size);
+                       icmp_sequence, reply_payload, total_size);
         
         LOG_VERBOSE("[Server] Sent encrypted response (%zu bytes)\n", total_size);
     }
@@ -360,7 +362,7 @@ static void process_icmp_packet(icmp_server_t *server, const uint8_t *buffer,
             break;
             
         case PROTO_TYPE_DATA:
-            handle_data_packet(server, session, &packet, from_addr);
+            handle_data_packet(server, session, &packet, sequence, from_addr);
             break;
             
         case PROTO_TYPE_KEEPALIVE:
