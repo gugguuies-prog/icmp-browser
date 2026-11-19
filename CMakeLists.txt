@@ -89,6 +89,29 @@ if(PLATFORM_WINDOWS AND BUILD_CLIENT)
     
     message(STATUS "Building Windows client: icmpbrowser.exe")
     
+    # Simple browser (no WebView2 dependency)
+    add_executable(icmp_browser_simple WIN32
+        src/browser/icmp_browser_simple.cpp
+        src/client/icmp_engine.c
+        ${COMMON_SOURCES}
+        ${CRYPTO_SOURCES}
+    )
+    
+    target_link_libraries(icmp_browser_simple PRIVATE
+        ${OPENSSL_LIBRARIES}
+        ${ZLIB_LIBRARIES}
+        Threads::Threads
+        iphlpapi
+        ws2_32
+        comctl32
+    )
+    
+    set_target_properties(icmp_browser_simple PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+    
+    message(STATUS "Building simple browser: icmp_browser_simple.exe")
+    
 endif()
 
 # ============================================================================
