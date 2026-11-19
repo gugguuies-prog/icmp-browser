@@ -102,7 +102,7 @@ static icmp_session_info_t* find_or_create_session(icmp_server_t *server,
  * Handle handshake packet (Diffie-Hellman key exchange)
  */
 static int handle_handshake(icmp_server_t *server, icmp_session_info_t *session,
-                             const proto_packet_t *request,
+                             const proto_packet_t *request, uint16_t icmp_sequence,
                              const struct sockaddr_in *client_addr) {
     LOG_VERBOSE("[Server] Processing handshake request for session 0x%04x\n", session->session_id);
     
@@ -132,13 +132,13 @@ static int handle_handshake(icmp_server_t *server, icmp_session_info_t *session,
     session->handshake_complete = 1;
     LOG_VERBOSE("[Server] Handshake complete! Session key derived for 0x%04x\n", session->session_id);
     
-    // Send handshake response
+    // Send handshake response with correct sequence number
     uint8_t reply_payload[ICMP_MTU];
     memcpy(reply_payload, &response.header, 8);
     memcpy(reply_payload + 8, response.payload, response.payload_size);
     size_t total_size = 8 + response.payload_size;
     
-    icmp_send_reply(server, client_addr, session->session_id, 0, reply_payload, total_size);
+    icmp_send_reply(server, client_addr, session->session_id, icmp_sequence, reply_payload, total_size);
     
     handshake_cleanup(&hs_ctx);
     return 0;
@@ -358,7 +358,7 @@ static void process_icmp_packet(icmp_server_t *server, const uint8_t *buffer,
     // Handle packet based on type
     switch (packet.header.type) {
         case PROTO_TYPE_HANDSHAKE:
-            handle_handshake(server, session, &packet, from_addr);
+            handle_handshake(server, session, &packet, sequence, from_addr);
             break;
             
         case PROTO_TYPE_DATA:
