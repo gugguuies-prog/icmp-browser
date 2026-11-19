@@ -426,6 +426,8 @@ int receive_http_response(icmp_session_t *icmp_session,
     printf("\n%s[*]%s Déchiffrement et décapsulation...\n", 
            COLOR_CYAN, COLOR_RESET);
     
+    printf("    Debug: Utilisation data_sequence=%d pour décryptage\n", g_data_sequence);
+    
     uint8_t decrypted[2048];
     size_t decrypted_size;
     

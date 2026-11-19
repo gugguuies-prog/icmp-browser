@@ -183,6 +183,8 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     // Increment session counter for next packet
     session->data_sequence_counter++;
     
+    LOG_VERBOSE("[Server] Encrypting response with data_seq=%d\n", session->data_sequence_counter);
+    
     // TODO: Forward to TUN device
     // For now, just echo back an encrypted response
     
