@@ -193,7 +193,7 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     result = proto_encapsulate(decrypted, decrypted_size,
                                session->session_key,
                                session->session_id,
-                               data_seq + 1,  // Response uses next sequence
+                               session->data_sequence_counter,  // Use incremented session counter
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
@@ -208,6 +208,9 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
                        icmp_sequence, reply_payload, total_size);
         
         LOG_VERBOSE("[Server] Sent encrypted response (%zu bytes)\n", total_size);
+        
+        // Increment counter again after sending response
+        session->data_sequence_counter++;
     }
     
     return 0;
