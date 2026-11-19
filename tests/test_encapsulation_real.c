@@ -523,11 +523,10 @@ int main(int argc, char *argv[]) {
     printf("%s[✓]%s Session ICMP créée (ID: 0x%04x)\n", 
            COLOR_GREEN, COLOR_RESET, session->session_id);
     
-    // Étape 2: Tester la connectivité
-    if (test_connectivity(session) != 0) {
-        icmp_session_destroy(session);
-        return 1;
-    }
+    // Skip connectivity test - go directly to handshake
+    // (The server only responds to protocol packets, not raw pings)
+    printf("\n%s[*]%s Skipping connectivity test (server requires protocol packets)\n",
+           COLOR_CYAN, COLOR_RESET);
     
     // Étape 3: Handshake DH
     handshake_context_t hs_ctx;
