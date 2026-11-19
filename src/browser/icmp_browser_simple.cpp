@@ -5,6 +5,10 @@
  * Reuses the tested ICMP tunnel code
  */
 
+// IMPORTANT: Include winsock2.h BEFORE windows.h to avoid conflicts
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <commctrl.h>
 #include <richedit.h>
@@ -22,6 +26,7 @@ extern "C" {
 }
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "ws2_32.lib")
 #pragma comment(linker, "\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 // Control IDs
@@ -383,10 +388,10 @@ void CreateUI(HWND hwnd) {
     RECT rc;
     GetClientRect(hwnd, &rc);
     
-    HFONT hFont = CreateFont(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                             CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-                             DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+    HFONT hFont = CreateFontA(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                              DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                              CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                              DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
     
     int margin = 10;
     int toolbarHeight = 50;
@@ -435,7 +440,7 @@ void CreateUI(HWND hwnd) {
     SendMessage(g_hwndGoBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     
     // Content area
-    LoadLibrary(L"Msftedit.dll");
+    LoadLibraryW(L"Msftedit.dll");
     g_hwndContent = CreateWindowExW(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, L"",
                                      WS_CHILD | WS_VISIBLE | WS_VSCROLL | 
                                      ES_MULTILINE | ES_READONLY,
@@ -446,7 +451,10 @@ void CreateUI(HWND hwnd) {
     SendMessage(g_hwndContent, WM_SETFONT, (WPARAM)hFont, TRUE);
     
     // Status bar
-    g_hwndStatus = CreateWindowExW(0, L"STATIC", L"Prêt • Serveur: " + std::wstring(g_serverIp.begin(), g_serverIp.end()).c_str(),
+    std::wstring statusText = L"Prêt • Serveur: ";
+    statusText += std::wstring(g_serverIp.begin(), g_serverIp.end());
+    
+    g_hwndStatus = CreateWindowExW(0, L"STATIC", statusText.c_str(),
                                     WS_CHILD | WS_VISIBLE | SS_LEFT,
                                     margin, rc.bottom - 25,
                                     rc.right - margin * 2, 20,
