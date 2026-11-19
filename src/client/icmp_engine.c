@@ -55,7 +55,8 @@ icmp_session_t* icmp_session_create(const char *server_ip) {
     strncpy(session->server_ip, server_ip, sizeof(session->server_ip) - 1);
 
     // Initialize session parameters
-    session->session_id = generate_session_id();
+    // Note: Windows IcmpSendEcho always uses id=1, so we must use id=1 too
+    session->session_id = 1;  // Fixed ID to match Windows ICMP behavior
     session->sequence_counter = 0;
     session->timeout_ms = ICMP_TIMEOUT_MS;
     session->max_retries = ICMP_MAX_RETRIES;
