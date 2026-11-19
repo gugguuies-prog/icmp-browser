@@ -5,6 +5,9 @@
  */
 
 #include "icmp_handler.h"
+#include "../common/protocol.h"
+#include "../common/handshake.h"
+#include "../crypto/aes_gcm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +16,14 @@
 #include <time.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
+
+// Debug logging
+#define LOG_VERBOSE(...) if (g_verbose) printf(__VA_ARGS__)
+static int g_verbose = 0;
+
+void icmp_set_verbose(int verbose) {
+    g_verbose = verbose;
+}
 
 /**
  * Calculate ICMP checksum (RFC 1071)
@@ -75,11 +86,122 @@ static icmp_session_info_t* find_or_create_session(icmp_server_t *server,
         session->session_id = session_id;
         session->last_seen = now;
         session->active = 1;
+        session->handshake_complete = 0;
+        
+        char client_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &client_addr->sin_addr, client_ip, sizeof(client_ip));
+        LOG_VERBOSE("[Server] New session created: ID=0x%04x from %s\n", session_id, client_ip);
     }
     
     mutex_unlock(&server->sessions_lock);
     
     return session;
+}
+
+/**
+ * Handle handshake packet (Diffie-Hellman key exchange)
+ */
+static int handle_handshake(icmp_server_t *server, icmp_session_info_t *session,
+                             const proto_packet_t *request,
+                             const struct sockaddr_in *client_addr) {
+    LOG_VERBOSE("[Server] Processing handshake request for session 0x%04x\n", session->session_id);
+    
+    // Initialize handshake context for this session
+    handshake_context_t hs_ctx;
+    if (handshake_init(&hs_ctx, session->session_id) != HANDSHAKE_SUCCESS) {
+        LOG_VERBOSE("[Server] Failed to initialize handshake context\n");
+        return -1;
+    }
+    
+    // Process handshake request and generate response
+    proto_packet_t response;
+    int result = handshake_server_process(&hs_ctx, request, &response);
+    if (result != HANDSHAKE_SUCCESS) {
+        LOG_VERBOSE("[Server] Handshake processing failed: %s\n", handshake_error_string(result));
+        handshake_cleanup(&hs_ctx);
+        return -1;
+    }
+    
+    // Get the derived session key
+    if (handshake_get_session_key(&hs_ctx, session->session_key) != HANDSHAKE_SUCCESS) {
+        LOG_VERBOSE("[Server] Failed to get session key\n");
+        handshake_cleanup(&hs_ctx);
+        return -1;
+    }
+    
+    session->handshake_complete = 1;
+    LOG_VERBOSE("[Server] Handshake complete! Session key derived for 0x%04x\n", session->session_id);
+    
+    // Send handshake response
+    uint8_t reply_payload[ICMP_MTU];
+    memcpy(reply_payload, &response.header, 8);
+    memcpy(reply_payload + 8, response.payload, response.payload_size);
+    size_t total_size = 8 + response.payload_size;
+    
+    icmp_send_reply(server, client_addr, session->session_id, 0, reply_payload, total_size);
+    
+    handshake_cleanup(&hs_ctx);
+    return 0;
+}
+
+/**
+ * Handle data packet (encrypted IP packet)
+ */
+static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *session,
+                               const proto_packet_t *packet,
+                               const struct sockaddr_in *client_addr) {
+    if (!session->handshake_complete) {
+        LOG_VERBOSE("[Server] Received DATA before handshake complete\n");
+        return -1;
+    }
+    
+    LOG_VERBOSE("[Server] Processing DATA packet for session 0x%04x (seq=%d)\n", 
+                session->session_id, packet->header.fragment_num);
+    
+    // Decapsulate (decrypt) the packet
+    uint8_t decrypted[2048];
+    size_t decrypted_size;
+    
+    int result = proto_decapsulate(packet, session->session_key,
+                                    session->session_id,
+                                    packet->header.fragment_num,
+                                    decrypted, &decrypted_size, sizeof(decrypted));
+    
+    if (result != PROTO_SUCCESS) {
+        LOG_VERBOSE("[Server] Decapsulation failed: %s\n", proto_error_string(result));
+        return -1;
+    }
+    
+    LOG_VERBOSE("[Server] Decrypted %zu bytes\n", decrypted_size);
+    
+    // TODO: Forward to TUN device
+    // For now, just echo back an encrypted response
+    
+    // Create a dummy response (echo the decrypted data back)
+    proto_packet_t response_packets[10];
+    size_t response_count;
+    
+    result = proto_encapsulate(decrypted, decrypted_size,
+                               session->session_key,
+                               session->session_id,
+                               packet->header.fragment_num + 1,
+                               response_packets, &response_count, 10);
+    
+    if (result == PROTO_SUCCESS && response_count > 0) {
+        // Send first fragment (simplified - should send all fragments)
+        proto_packet_t *resp = &response_packets[0];
+        uint8_t reply_payload[ICMP_MTU];
+        memcpy(reply_payload, &resp->header, 8);
+        memcpy(reply_payload + 8, resp->payload, resp->payload_size);
+        size_t total_size = 8 + resp->payload_size;
+        
+        icmp_send_reply(server, client_addr, session->session_id, 
+                       packet->header.fragment_num, reply_payload, total_size);
+        
+        LOG_VERBOSE("[Server] Sent encrypted response (%zu bytes)\n", total_size);
+    }
+    
+    return 0;
 }
 
 /**
@@ -193,23 +315,69 @@ static void process_icmp_packet(icmp_server_t *server, const uint8_t *buffer,
     
     // Update session
     icmp_session_info_t *session = find_or_create_session(server, from_addr, session_id);
-    if (session) {
-        session->packets_received++;
-        session->bytes_received += size;
-        session->last_sequence = sequence;
+    if (!session) {
+        LOG_VERBOSE("[Server] Failed to create session\n");
+        return;
     }
+    
+    session->packets_received++;
+    session->bytes_received += size;
+    session->last_sequence = sequence;
     
     // Update global statistics
     server->total_packets_received++;
     server->total_bytes_received += size;
     
+    char client_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &from_addr->sin_addr, client_ip, sizeof(client_ip));
+    LOG_VERBOSE("[Server] Received ICMP packet from %s (session=0x%04x, seq=%d, size=%zu)\n",
+                client_ip, session_id, sequence, payload_size);
+    
+    // Parse protocol packet
+    if (payload_size < 8) {
+        LOG_VERBOSE("[Server] Payload too small\n");
+        return;
+    }
+    
+    proto_packet_t packet;
+    memcpy(&packet.header, payload, 8);
+    packet.payload_size = payload_size - 8;
+    
+    if (packet.payload_size > 0 && packet.payload_size <= PROTO_MAX_PAYLOAD) {
+        memcpy(packet.payload, payload + 8, packet.payload_size);
+    } else {
+        LOG_VERBOSE("[Server] Invalid payload size: %zu\n", packet.payload_size);
+        return;
+    }
+    
+    LOG_VERBOSE("[Server] Protocol packet: type=%s, flags=0x%02x\n",
+                proto_type_string(packet.header.type), packet.header.flags);
+    
+    // Handle packet based on type
+    switch (packet.header.type) {
+        case PROTO_TYPE_HANDSHAKE:
+            handle_handshake(server, session, &packet, from_addr);
+            break;
+            
+        case PROTO_TYPE_DATA:
+            handle_data_packet(server, session, &packet, from_addr);
+            break;
+            
+        case PROTO_TYPE_KEEPALIVE:
+            LOG_VERBOSE("[Server] Keepalive received\n");
+            // Just acknowledge
+            icmp_send_reply(server, from_addr, session_id, sequence, payload, payload_size);
+            break;
+            
+        default:
+            LOG_VERBOSE("[Server] Unknown packet type: %d\n", packet.header.type);
+            break;
+    }
+    
     // Call callback if registered
     if (server->on_packet_received) {
         server->on_packet_received(from_addr, payload, payload_size, session_id, sequence);
     }
-    
-    // Send Echo Reply
-    icmp_send_reply(server, from_addr, session_id, sequence, payload, payload_size);
 }
 
 /**

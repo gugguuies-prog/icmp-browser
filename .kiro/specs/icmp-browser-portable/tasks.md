@@ -1,8 +1,19 @@
-# Implementation Tasks - ICMP Browser Portable
+# Implementation Plan
 
-## Phase 1: Fondations et Crypto (Client + Serveur)
+## Overview
 
-### Task 1.1: Implémentation du chiffrement AES-256-GCM
+This implementation plan covers the development of the ICMP Browser Portable system, consisting of:
+- **Client**: Windows application with WebView2 browser and ICMP tunnel client
+- **Server**: Linux/Armbian server with TUN/TAP interface and ICMP tunnel server
+- **Protocol**: Secure ICMP tunnel with AES-256-GCM encryption and Diffie-Hellman key exchange
+
+The plan is organized into 6 phases with 19 tasks, progressing from foundational cryptographic components through protocol implementation, network interfaces, user interface, optimizations, and final testing/deployment.
+
+## Tasks
+
+### Phase 1: Fondations et Crypto (Client + Serveur)
+
+- [ ] 1.1 Implémentation du chiffrement AES-256-GCM
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 4h
@@ -48,7 +59,7 @@ assert(result == -1);  // Devrait échouer
 
 ---
 
-### Task 1.2: Implémentation de Diffie-Hellman
+- [ ] 1.2 Implémentation de Diffie-Hellman
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 3h
@@ -88,7 +99,7 @@ assert(memcmp(client_shared, server_shared, 256) == 0);
 
 ---
 
-### Task 1.3: Bibliothèque ICMP Client (Windows Icmp.dll)
+- [ ] 1.3 Bibliothèque ICMP Client (Windows Icmp.dll)
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 6h
@@ -134,7 +145,7 @@ assert(result == ICMP_TIMEOUT);
 
 ---
 
-### Task 1.4: Bibliothèque ICMP Serveur (Linux Raw Sockets)
+- [ ] 1.4 Bibliothèque ICMP Serveur (Linux Raw Sockets)
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 6h
@@ -173,9 +184,9 @@ assert(result == 0);
 
 ---
 
-## Phase 2: Encapsulation et Protocole
+### Phase 2: Encapsulation et Protocole
 
-### Task 2.1: Encapsulation/Décapsulation ICMP (Client)
+- [ ] 2.1 Encapsulation/Décapsulation ICMP (Client)
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 5h
@@ -221,7 +232,7 @@ assert(memcmp(reconstructed, large_packet, 3000) == 0);
 
 ---
 
-### Task 2.2: Handshake DH via ICMP
+- [ ] 2.2 Handshake DH via ICMP
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 4h
@@ -267,7 +278,7 @@ assert(memcmp(client_session->session_key,
 
 ---
 
-### Task 2.3: Gestion des Sessions Serveur
+- [ ] 2.3 Gestion des Sessions Serveur
 **Status:** todo
 **Priority:** medium
 **Estimated Time:** 4h
@@ -305,9 +316,9 @@ assert(found == NULL);  // Devrait être supprimée
 
 ---
 
-## Phase 3: Interface TUN/TAP et Routage (Serveur)
+### Phase 3: Interface TUN/TAP et Routage (Serveur)
 
-### Task 3.1: Gestion de l'interface TUN (Serveur Linux)
+- [ ] 3.1 Gestion de l'interface TUN (Serveur Linux)
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 5h
@@ -349,7 +360,7 @@ assert(result > 0 || result == TUN_TIMEOUT);
 
 ---
 
-### Task 3.2: Configuration NAT et iptables (Serveur)
+- [ ] 3.2 Configuration NAT et iptables (Serveur)
 **Status:** todo
 **Priority:** medium
 **Estimated Time:** 3h
@@ -384,9 +395,9 @@ assert $? == 0
 
 ---
 
-## Phase 4: Proxy HTTP et Intégration WebView2 (Client)
+### Phase 4: Proxy HTTP et Intégration WebView2 (Client)
 
-### Task 4.1: Serveur Proxy HTTP Local
+- [ ] 4.1 Serveur Proxy HTTP Local
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 8h
@@ -435,7 +446,7 @@ assert(strstr(response, "HTTP/1.1") != NULL);
 
 ---
 
-### Task 4.2: Intégration WebView2
+- [ ] 4.2 Intégration WebView2
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 6h
@@ -476,7 +487,7 @@ assert(wcscmp(url, L"https://example.com") == 0);
 
 ---
 
-### Task 4.3: Interface Utilisateur (UI)
+- [ ] 4.3 Interface Utilisateur (UI)
 **Status:** todo
 **Priority:** medium
 **Estimated Time:** 6h
@@ -512,9 +523,9 @@ assert(wcsstr(text, L"192.168.1.100") != NULL);
 
 ---
 
-## Phase 5: Optimisations et Performance
+### Phase 5: Optimisations et Performance
 
-### Task 5.1: Files d'Attente Prioritaires
+- [ ] 5.1 Files d'Attente Prioritaires
 **Status:** todo
 **Priority:** medium
 **Estimated Time:** 4h
@@ -551,7 +562,7 @@ assert(p == packet1);  // LOW en dernier
 
 ---
 
-### Task 5.2: Compression zlib
+- [ ] 5.2 Compression zlib
 **Status:** todo
 **Priority:** low
 **Estimated Time:** 3h
@@ -588,7 +599,7 @@ assert(memcmp(input, decompressed, 1000) == 0);
 
 ---
 
-### Task 5.3: Statistiques et Monitoring
+- [ ] 5.3 Statistiques et Monitoring
 **Status:** todo
 **Priority:** low
 **Estimated Time:** 3h
@@ -622,9 +633,9 @@ assert(stats_get_packet_loss_rate(stats) == 0.0);
 
 ---
 
-## Phase 6: Tests d'Intégration et Déploiement
+### Phase 6: Tests d'Intégration et Déploiement
 
-### Task 6.1: Tests End-to-End Client-Serveur
+- [ ] 6.1 Tests End-to-End Client-Serveur
 **Status:** todo
 **Priority:** high
 **Estimated Time:** 8h
@@ -664,7 +675,7 @@ kill $SERVER_PID
 
 ---
 
-### Task 6.2: Tests de Performance et Charge
+- [ ] 6.2 Tests de Performance et Charge
 **Status:** todo
 **Priority:** medium
 **Estimated Time:** 4h
@@ -697,7 +708,7 @@ assert [ $THROUGHPUT -gt 1000000 ]  # 1 Mbps = 1000000 bps
 
 ---
 
-### Task 6.3: Packaging et Distribution
+- [ ] 6.3 Packaging et Distribution
 **Status:** todo
 **Priority:** medium
 **Estimated Time:** 4h
@@ -733,7 +744,7 @@ icmp-server_1.0_armhf.deb
 
 ---
 
-### Task 6.4: Documentation Complète
+- [ ] 6.4 Documentation Complète
 **Status:** todo
 **Priority:** medium
 **Estimated Time:** 4h
@@ -757,43 +768,7 @@ Rédiger la documentation utilisateur et développeur.
 
 ---
 
-## Résumé des Phases
-
-| Phase | Tâches | Temps Estimé | Priorité |
-|-------|--------|--------------|----------|
-| 1. Fondations | 4 tâches | 19h | High |
-| 2. Protocole | 3 tâches | 13h | High |
-| 3. TUN/TAP | 2 tâches | 8h | High |
-| 4. UI/WebView2 | 3 tâches | 20h | High |
-| 5. Optimisations | 3 tâches | 10h | Medium/Low |
-| 6. Tests/Deploy | 4 tâches | 20h | High/Medium |
-| **TOTAL** | **19 tâches** | **90h** | |
-
-## Ordre d'Implémentation Recommandé
-
-1. **Semaine 1** : Phase 1 (Fondations) - Crypto + ICMP de base
-2. **Semaine 2** : Phase 2 (Protocole) - Encapsulation + Handshake
-3. **Semaine 3** : Phase 3 (Serveur) + Phase 4.1 (Proxy HTTP)
-4. **Semaine 4** : Phase 4.2-4.3 (UI/WebView2)
-5. **Semaine 5** : Phase 5 (Optimisations) + Phase 6.1-6.2 (Tests)
-6. **Semaine 6** : Phase 6.3-6.4 (Packaging + Documentation)
-
-## Tests Finaux Obligatoires
-
-Avant de considérer le projet terminé :
-
-✅ **Test 1** : Le test `test_icmp_dll.exe` réussit (VALIDÉ ✓)  
-☐ **Test 2** : Handshake DH client-serveur réussit  
-☐ **Test 3** : Navigation HTTP basique fonctionne (http://example.com)  
-☐ **Test 4** : Navigation HTTPS fonctionne (https://google.com)  
-☐ **Test 5** : Gros téléchargement fonctionne (fichier de 10 MB)  
-☐ **Test 6** : Pas de fuite mémoire après 1000 requêtes  
-☐ **Test 7** : Débit > 1 Mbps mesuré  
-☐ **Test 8** : Latence moyenne < 100ms (hors latence réseau)  
-☐ **Test 9** : Reconnexion automatique après perte réseau  
-☐ **Test 10** : Fonctionne sans droits admin sur Windows 10/11  
-
-## Notes Importantes
+## Notes
 
 - **Privilèges** : Le client ne nécessite PAS de droits admin (validé par test). Le serveur nécessite root pour raw sockets et TUN/TAP.
 - **Plateformes** : Client = Windows 10/11 (x64/ARM64), Serveur = Linux/Armbian (x64/ARM)
@@ -801,3 +776,111 @@ Avant de considérer le projet terminé :
   - Client: WebView2 Runtime, OpenSSL, zlib
   - Serveur: OpenSSL, zlib, iptables
 - **Sécurité** : Utilisation responsable uniquement. Ne pas utiliser pour contourner des restrictions légales.
+
+## Task Dependency Graph
+
+```json
+{
+  "waves": [
+    {
+      "name": "Wave 1: Crypto Foundation",
+      "tasks": ["1.1", "1.2"],
+      "description": "Core cryptographic primitives"
+    },
+    {
+      "name": "Wave 2: ICMP Infrastructure",
+      "tasks": ["1.3", "1.4"],
+      "description": "Platform-specific ICMP handling",
+      "dependsOn": ["Wave 1"]
+    },
+    {
+      "name": "Wave 3: Protocol Layer",
+      "tasks": ["2.1", "2.2", "2.3"],
+      "description": "Encapsulation and handshake protocol",
+      "dependsOn": ["Wave 2"]
+    },
+    {
+      "name": "Wave 4: Server Networking",
+      "tasks": ["3.1", "3.2"],
+      "description": "TUN/TAP and routing configuration",
+      "dependsOn": ["Wave 3"]
+    },
+    {
+      "name": "Wave 5: Client Application",
+      "tasks": ["4.1", "4.2", "4.3"],
+      "description": "HTTP proxy and browser UI",
+      "dependsOn": ["Wave 3"]
+    },
+    {
+      "name": "Wave 6: Optimizations",
+      "tasks": ["5.1", "5.2", "5.3"],
+      "description": "Performance enhancements (can run in parallel)",
+      "dependsOn": ["Wave 3"]
+    },
+    {
+      "name": "Wave 7: Integration & Deployment",
+      "tasks": ["6.1", "6.2", "6.3", "6.4"],
+      "description": "End-to-end testing and packaging",
+      "dependsOn": ["Wave 4", "Wave 5"]
+    }
+  ]
+}
+```
+
+```mermaid
+graph TD
+    1.1[1.1 AES-256-GCM] --> 2.1[2.1 Encapsulation ICMP]
+    1.2[1.2 Diffie-Hellman] --> 2.2[2.2 Handshake DH]
+    1.3[1.3 ICMP Client Windows] --> 2.1
+    1.4[1.4 ICMP Server Linux] --> 2.2
+    
+    2.1 --> 4.1[4.1 Proxy HTTP]
+    2.2 --> 2.3[2.3 Sessions Serveur]
+    2.3 --> 3.1[3.1 Interface TUN]
+    
+    3.1 --> 3.2[3.2 NAT/iptables]
+    3.2 --> 6.1[6.1 Tests E2E]
+    
+    4.1 --> 4.2[4.2 WebView2]
+    4.2 --> 4.3[4.3 UI]
+    4.3 --> 6.1
+    
+    2.1 --> 5.1[5.1 Files Prioritaires]
+    2.1 --> 5.2[5.2 Compression]
+    4.3 --> 5.3[5.3 Statistiques]
+    
+    6.1 --> 6.2[6.2 Tests Performance]
+    6.2 --> 6.3[6.3 Packaging]
+    6.3 --> 6.4[6.4 Documentation]
+    
+    classDef phase1 fill:#e1f5ff
+    classDef phase2 fill:#fff4e1
+    classDef phase3 fill:#ffe1f5
+    classDef phase4 fill:#e1ffe1
+    classDef phase5 fill:#f5e1ff
+    classDef phase6 fill:#ffe1e1
+    
+    class 1.1,1.2,1.3,1.4 phase1
+    class 2.1,2.2,2.3 phase2
+    class 3.1,3.2 phase3
+    class 4.1,4.2,4.3 phase4
+    class 5.1,5.2,5.3 phase5
+    class 6.1,6.2,6.3,6.4 phase6
+```
+
+### Critical Path
+1. Phase 1: Fondations (1.1-1.4) - 19h
+2. Phase 2: Protocole (2.1-2.3) - 13h
+3. Phase 3: TUN/TAP (3.1-3.2) - 8h
+4. Phase 4: UI/Proxy (4.1-4.3) - 20h
+5. Phase 6: Tests/Deploy (6.1-6.4) - 20h
+
+Total critical path: **80h**
+
+Phase 5 (Optimisations) can be done in parallel with other phases as these are enhancements.
+
+### Parallel Work Opportunities
+- Tasks 1.1 and 1.2 can be done in parallel (both crypto)
+- Tasks 1.3 and 1.4 can be done in parallel (client vs server ICMP)
+- Tasks 5.1, 5.2, 5.3 can be done anytime after their dependencies are met
+- Documentation (6.4) can start early and be updated throughout

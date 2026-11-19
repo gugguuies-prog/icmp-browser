@@ -79,6 +79,9 @@ int main(int argc, char *argv[]) {
     printf("[Server] Verbose: %s\n", verbose ? "enabled" : "disabled");
     printf("\n");
     
+    // Set verbose logging
+    icmp_set_verbose(verbose);
+    
     // Setup signal handlers
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);

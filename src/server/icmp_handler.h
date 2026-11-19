@@ -69,6 +69,10 @@ typedef struct {
     time_t last_seen;                    // Last activity timestamp
     uint8_t active;                      // Session active flag
     
+    // Crypto state
+    uint8_t session_key[32];             // AES-256 session key
+    uint8_t handshake_complete;          // Handshake completed flag
+    
     // Statistics
     uint32_t packets_received;           // Total packets received
     uint32_t packets_sent;               // Total packets sent
@@ -287,5 +291,12 @@ const char* icmp_server_error_string(int error_code);
  * Note: Used internally, exposed for testing
  */
 uint16_t icmp_checksum(const uint8_t *data, size_t len);
+
+/**
+ * Set verbose logging
+ * 
+ * @param verbose 1 to enable verbose logs, 0 to disable
+ */
+void icmp_set_verbose(int verbose);
 
 #endif // ICMP_HANDLER_H
