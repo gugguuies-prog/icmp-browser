@@ -41,6 +41,9 @@
 #define COLOR_BLUE    "\033[34m"
 #define COLOR_CYAN    "\033[36m"
 
+// Global data sequence counter for DATA packets (separate from ICMP sequence)
+static uint16_t g_data_sequence = 0;
+
 /**
  * Calculer le checksum TCP/IP
  */
@@ -331,12 +334,11 @@ int send_http_request(icmp_session_t *icmp_session,
     
     // IMPORTANT: Use data sequence counter starting at 0 (separate from ICMP sequence)
     // This matches the server's data_sequence_counter initialization
-    static uint16_t data_sequence = 0;
     
     int result = proto_encapsulate(ip_packet, ip_size,
                                     session_key,
                                     icmp_session->session_id,
-                                    data_sequence,  // Use data sequence, not ICMP sequence
+                                    g_data_sequence,  // Use global data sequence, not ICMP sequence
                                     packets, &packet_count, 10);
     
     if (result != PROTO_SUCCESS) {
@@ -373,7 +375,7 @@ int send_http_request(icmp_session_t *icmp_session,
     }
     
     // Increment data sequence after successful send
-    data_sequence++;
+    g_data_sequence++;
     
     return 0;
 }
@@ -427,9 +429,13 @@ int receive_http_response(icmp_session_t *icmp_session,
     uint8_t decrypted[2048];
     size_t decrypted_size;
     
+    // IMPORTANT: Server responds with data_seq + 1
+    // We sent with data_seq=0, so response uses data_seq=1
+    // After send, g_data_sequence was incremented, so it already has the right value
+    
     result = proto_decapsulate(&response, session_key,
                                 icmp_session->session_id,
-                                response.header.fragment_num,
+                                g_data_sequence,  // Use current g_data_sequence (already incremented after send)
                                 decrypted, &decrypted_size, sizeof(decrypted));
     
     if (result != PROTO_SUCCESS) {
