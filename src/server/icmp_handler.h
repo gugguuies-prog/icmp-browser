@@ -66,6 +66,7 @@ typedef struct {
     struct sockaddr_in client_addr;      // Client IP address
     uint16_t session_id;                 // Session ID (from ICMP id field)
     uint16_t last_sequence;              // Last received sequence number
+    uint16_t data_sequence_counter;      // Counter for DATA packets (starts at 0)
     time_t last_seen;                    // Last activity timestamp
     uint8_t active;                      // Session active flag
     

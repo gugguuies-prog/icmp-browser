@@ -87,6 +87,7 @@ static icmp_session_info_t* find_or_create_session(icmp_server_t *server,
         session->last_seen = now;
         session->active = 1;
         session->handshake_complete = 0;
+        session->data_sequence_counter = 0;  // Start at 0 for DATA packets
         
         char client_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr->sin_addr, client_ip, sizeof(client_ip));
@@ -155,26 +156,32 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
         return -1;
     }
     
-    LOG_VERBOSE("[Server] Processing DATA packet for session 0x%04x (ICMP seq=%d, frag_num=%d)\n", 
-                session->session_id, icmp_sequence, packet->header.fragment_num);
+    // Use session's internal counter for decryption, not ICMP sequence
+    uint16_t data_seq = session->data_sequence_counter;
+    
+    LOG_VERBOSE("[Server] Processing DATA packet for session 0x%04x (ICMP seq=%d, data_seq=%d, frag_num=%d)\n", 
+                session->session_id, icmp_sequence, data_seq, packet->header.fragment_num);
     
     // Decapsulate (decrypt) the packet
-    // IMPORTANT: Use the ICMP sequence number for AAD, not fragment_num
+    // IMPORTANT: Use the session's data sequence counter for AAD
     uint8_t decrypted[2048];
     size_t decrypted_size;
     
     int result = proto_decapsulate(packet, session->session_key,
                                     session->session_id,
-                                    icmp_sequence,  // Use ICMP sequence, not fragment_num
+                                    data_seq,  // Use session counter, not ICMP sequence
                                     decrypted, &decrypted_size, sizeof(decrypted));
     
     if (result != PROTO_SUCCESS) {
         LOG_VERBOSE("[Server] Decapsulation failed: %s\n", proto_error_string(result));
-        LOG_VERBOSE("[Server] Debug: session_id=0x%04x, icmp_seq=%d\n", session->session_id, icmp_sequence);
+        LOG_VERBOSE("[Server] Debug: session_id=0x%04x, data_seq=%d\n", session->session_id, data_seq);
         return -1;
     }
     
     LOG_VERBOSE("[Server] Decrypted %zu bytes\n", decrypted_size);
+    
+    // Increment session counter for next packet
+    session->data_sequence_counter++;
     
     // TODO: Forward to TUN device
     // For now, just echo back an encrypted response
@@ -186,7 +193,7 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     result = proto_encapsulate(decrypted, decrypted_size,
                                session->session_key,
                                session->session_id,
-                               icmp_sequence + 1,  // Response uses next sequence
+                               data_seq + 1,  // Response uses next sequence
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
