@@ -35,6 +35,11 @@
 #define ID_REFRESH_BTN  1005
 #define ID_CONTENT      1006
 #define ID_STATUS       1007
+#define ID_SETTINGS_BTN 1008
+#define ID_MENU_SERVER  2001
+#define ID_MENU_HISTORY 2002
+#define ID_MENU_BOOKMARKS 2003
+#define ID_MENU_ABOUT   2004
 
 // Global state
 HWND g_hwndMain = NULL;
@@ -42,19 +47,29 @@ HWND g_hwndUrlBar = NULL;
 HWND g_hwndContent = NULL;
 HWND g_hwndStatus = NULL;
 HWND g_hwndGoBtn = NULL;
+HWND g_hwndBackBtn = NULL;
+HWND g_hwndFwdBtn = NULL;
+HWND g_hwndRefreshBtn = NULL;
 
 icmp_session_t* g_session = NULL;
 uint8_t g_sessionKey[32];
 bool g_handshakeComplete = false;
 uint16_t g_dataSequence = 0;
 std::string g_serverIp = "192.168.1.40";
+std::vector<std::string> g_history;
+int g_historyPos = -1;
 
 // Forward declarations
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void CreateUI(HWND hwnd);
 void OnNavigate();
+void OnBack();
+void OnForward();
+void OnRefresh();
+void ShowServerDialog();
 void UpdateStatus(const std::wstring& text);
 void SetContent(const std::string& text);
+void EnableNavigationButtons();
 
 // Copy from test file
 extern "C" {
@@ -370,15 +385,82 @@ void OnNavigate() {
     WideCharToMultiByte(CP_UTF8, 0, wurl.c_str(), -1, &url[0], size, NULL, NULL);
     url.resize(size - 1);
     
-    // Disable go button
+    // Add to history
+    if (g_historyPos == -1 || g_history[g_historyPos] != url) {
+        // Remove forward history
+        if (g_historyPos < (int)g_history.size() - 1) {
+            g_history.erase(g_history.begin() + g_historyPos + 1, g_history.end());
+        }
+        g_history.push_back(url);
+        g_historyPos = g_history.size() - 1;
+    }
+    
+    // Disable navigation buttons
     EnableWindow(g_hwndGoBtn, FALSE);
+    EnableWindow(g_hwndBackBtn, FALSE);
+    EnableWindow(g_hwndFwdBtn, FALSE);
+    EnableWindow(g_hwndRefreshBtn, FALSE);
     
     // Fetch in background
     std::thread([url]() {
         std::string content = FetchUrl(url);
         PostMessage(g_hwndMain, WM_USER + 1, 0, (LPARAM)new std::string(content));
-        PostMessage(g_hwndMain, WM_USER + 2, 0, 0); // Re-enable button
+        PostMessage(g_hwndMain, WM_USER + 2, 0, 0); // Re-enable buttons
     }).detach();
+}
+
+// Go back
+void OnBack() {
+    if (g_historyPos > 0) {
+        g_historyPos--;
+        std::wstring wurl(g_history[g_historyPos].begin(), g_history[g_historyPos].end());
+        SetWindowTextW(g_hwndUrlBar, wurl.c_str());
+        OnNavigate();
+    }
+}
+
+// Go forward
+void OnForward() {
+    if (g_historyPos < (int)g_history.size() - 1) {
+        g_historyPos++;
+        std::wstring wurl(g_history[g_historyPos].begin(), g_history[g_historyPos].end());
+        SetWindowTextW(g_hwndUrlBar, wurl.c_str());
+        OnNavigate();
+    }
+}
+
+// Refresh
+void OnRefresh() {
+    OnNavigate();
+}
+
+// Show server configuration dialog
+void ShowServerDialog() {
+    char serverIp[256];
+    strcpy_s(serverIp, g_serverIp.c_str());
+    
+    // Simple input box (you can enhance this with a proper dialog)
+    std::wstring prompt = L"Entrez l'adresse IP du serveur ICMP:\n\nActuel: " + 
+                          std::wstring(g_serverIp.begin(), g_serverIp.end());
+    
+    wchar_t buffer[256];
+    wcscpy_s(buffer, std::wstring(g_serverIp.begin(), g_serverIp.end()).c_str());
+    
+    // For now, just show a message box with current server
+    std::wstring msg = L"Serveur ICMP actuel:\n\n" + 
+                       std::wstring(g_serverIp.begin(), g_serverIp.end()) + 
+                       L"\n\nPour changer le serveur, redémarrez le navigateur avec:\n" +
+                       L"icmp_browser_simple.exe <server_ip>";
+    
+    MessageBoxW(g_hwndMain, msg.c_str(), L"Configuration du serveur", MB_OK | MB_ICONINFORMATION);
+}
+
+// Enable/disable navigation buttons based on history
+void EnableNavigationButtons() {
+    EnableWindow(g_hwndBackBtn, g_historyPos > 0);
+    EnableWindow(g_hwndFwdBtn, g_historyPos < (int)g_history.size() - 1);
+    EnableWindow(g_hwndRefreshBtn, g_historyPos >= 0);
+    EnableWindow(g_hwndGoBtn, TRUE);
 }
 
 // Create UI
@@ -397,32 +479,32 @@ void CreateUI(HWND hwnd) {
     int y = margin;
     int x = margin;
     
-    // Back button
-    HWND hBtn = CreateWindowExW(0, L"BUTTON", L"◄",
-                                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                                 x, y, btnSize, btnSize,
-                                 hwnd, (HMENU)ID_BACK_BUTTON, NULL, NULL);
-    SendMessage(hBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
+    // Back button (Unicode: ◄ = 0x25C4)
+    g_hwndBackBtn = CreateWindowExW(0, L"BUTTON", L"🡐",
+                                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                                     x, y, btnSize, btnSize,
+                                     hwnd, (HMENU)ID_BACK_BUTTON, NULL, NULL);
+    SendMessage(g_hwndBackBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     x += btnSize + 5;
     
-    // Forward button
-    hBtn = CreateWindowExW(0, L"BUTTON", L"►",
-                           WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                           x, y, btnSize, btnSize,
-                           hwnd, (HMENU)ID_FWD_BUTTON, NULL, NULL);
-    SendMessage(hBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
+    // Forward button (Unicode: ► = 0x25BA)
+    g_hwndFwdBtn = CreateWindowExW(0, L"BUTTON", L"🡒",
+                                    WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                                    x, y, btnSize, btnSize,
+                                    hwnd, (HMENU)ID_FWD_BUTTON, NULL, NULL);
+    SendMessage(g_hwndFwdBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     x += btnSize + 5;
     
-    // Refresh button
-    hBtn = CreateWindowExW(0, L"BUTTON", L"⟳",
-                           WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                           x, y, btnSize, btnSize,
-                           hwnd, (HMENU)ID_REFRESH_BTN, NULL, NULL);
-    SendMessage(hBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
+    // Refresh button (Unicode: ⟳ = 0x27F3)
+    g_hwndRefreshBtn = CreateWindowExW(0, L"BUTTON", L"🗘",
+                                        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                                        x, y, btnSize, btnSize,
+                                        hwnd, (HMENU)ID_REFRESH_BTN, NULL, NULL);
+    SendMessage(g_hwndRefreshBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     x += btnSize + 10;
     
     // URL bar
-    int urlWidth = rc.right - x - btnSize - margin * 2 - 5;
+    int urlWidth = rc.right - x - btnSize * 2 - margin * 2 - 10;
     g_hwndUrlBar = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"http://example.com",
                                     WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
                                     x, y, urlWidth, btnSize,
@@ -431,11 +513,19 @@ void CreateUI(HWND hwnd) {
     x += urlWidth + 5;
     
     // Go button
-    g_hwndGoBtn = CreateWindowExW(0, L"BUTTON", L"→",
+    g_hwndGoBtn = CreateWindowExW(0, L"BUTTON", L"🡒",
                                    WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
                                    x, y, btnSize, btnSize,
                                    hwnd, (HMENU)ID_GO_BUTTON, NULL, NULL);
     SendMessage(g_hwndGoBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
+    x += btnSize + 5;
+    
+    // Settings button
+    HWND hSettingsBtn = CreateWindowExW(0, L"BUTTON", L"⚙",
+                                         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                                         x, y, btnSize, btnSize,
+                                         hwnd, (HMENU)ID_SETTINGS_BTN, NULL, NULL);
+    SendMessage(hSettingsBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     
     // Content area
     LoadLibraryW(L"Msftedit.dll");
@@ -458,6 +548,9 @@ void CreateUI(HWND hwnd) {
                                     rc.right - margin * 2, 20,
                                     hwnd, (HMENU)ID_STATUS, NULL, NULL);
     SendMessage(g_hwndStatus, WM_SETFONT, (WPARAM)hFont, TRUE);
+    
+    // Enable/disable navigation buttons
+    EnableNavigationButtons();
 }
 
 // Window procedure
@@ -470,6 +563,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_COMMAND:
             if (LOWORD(wParam) == ID_GO_BUTTON) {
                 OnNavigate();
+            } else if (LOWORD(wParam) == ID_BACK_BUTTON) {
+                OnBack();
+            } else if (LOWORD(wParam) == ID_FWD_BUTTON) {
+                OnForward();
+            } else if (LOWORD(wParam) == ID_REFRESH_BTN) {
+                OnRefresh();
+            } else if (LOWORD(wParam) == ID_SETTINGS_BTN) {
+                ShowServerDialog();
             }
             return 0;
             
@@ -505,7 +606,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
         
         case WM_USER + 2:
-            EnableWindow(g_hwndGoBtn, TRUE);
+            EnableNavigationButtons();
             return 0;
             
         case WM_DESTROY:
@@ -520,7 +621,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 // WinMain
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int nCmdShow) {
+    // Parse command line for server IP
+    if (lpCmdLine && strlen(lpCmdLine) > 0) {
+        g_serverIp = lpCmdLine;
+        // Remove quotes if present
+        if (g_serverIp.front() == '"') g_serverIp.erase(0, 1);
+        if (g_serverIp.back() == '"') g_serverIp.pop_back();
+    }
+    
     // Init common controls
     INITCOMMONCONTROLSEX icc = {sizeof(icc), ICC_STANDARD_CLASSES};
     InitCommonControlsEx(&icc);
