@@ -62,6 +62,7 @@ static std::string g_serverIp = "192.168.1.40";
 static icmp_session_t* g_session = NULL;
 static uint8_t g_sessionKey[32];
 static bool g_handshakeComplete = false;
+static uint16_t g_dataSequence = 0;  // Separate sequence counter for DATA packets
 
 // Fonts and brushes
 static HFONT g_fontNormal = NULL;
@@ -206,6 +207,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 icmp_session_destroy(g_session);
                 g_session = NULL;
                 g_handshakeComplete = false;
+                g_dataSequence = 0;
             }
             
             if (g_browser.get()) {
@@ -530,9 +532,11 @@ static std::string FetchViaICMP(const std::string& url) {
     proto_packet_t packets[10];
     size_t packet_count = 0;
     
+    uint16_t data_seq = g_dataSequence++;
+    
     int result = proto_encapsulate((const uint8_t*)http_request.c_str(), http_request.size(),
                                    g_sessionKey, g_session->session_id,
-                                   g_session->sequence_counter, packets, &packet_count, 10);
+                                   data_seq, packets, &packet_count, 10);
     
     if (result != PROTO_SUCCESS || packet_count == 0) {
         return "<html><body><h1>Error</h1><p>Failed to encapsulate request</p></body></html>";
@@ -579,8 +583,9 @@ static std::string FetchViaICMP(const std::string& url) {
         uint8_t decrypted[8192];
         size_t decrypted_size = 0;
         
+        // Use the same data_seq for decrypting the response
         int decrypt_result = proto_decapsulate(&response, g_sessionKey, g_session->session_id,
-                                              g_session->sequence_counter, decrypted,
+                                              data_seq, decrypted,
                                               &decrypted_size, sizeof(decrypted));
         
         if (decrypt_result == PROTO_SUCCESS && decrypted_size > 0) {
