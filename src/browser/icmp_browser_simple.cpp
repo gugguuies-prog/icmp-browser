@@ -19,10 +19,10 @@
 
 // Include C headers
 extern "C" {
-    #include "../client/icmp_engine.h"
-    #include "../common/protocol.h"
-    #include "../common/handshake.h"
-    #include "../crypto/aes_gcm.h"
+#include "../client/icmp_engine.h"
+#include "../common/protocol.h"
+#include "../common/handshake.h"
+#include "../crypto/aes_gcm.h"
 }
 
 #pragma comment(lib, "comctl32.lib")
@@ -195,22 +195,22 @@ bool DoHandshake() {
     UpdateStatus(L"Établissement de la connexion sécurisée...");
     
     if (!g_session) {
-        g_session = icmp_create_session(g_serverIp.c_str());
+        g_session = icmp_session_create(g_serverIp.c_str());
         if (!g_session) {
             UpdateStatus(L"❌ Impossible de créer la session ICMP");
             return false;
         }
     }
     
-    handshake_context_t* hsCtx = handshake_client_init();
-    if (!hsCtx) {
+    handshake_context_t hsCtx;
+    if (handshake_init(&hsCtx, g_session->session_id) != HANDSHAKE_SUCCESS) {
         UpdateStatus(L"❌ Échec initialisation handshake");
         return false;
     }
     
     proto_packet_t request;
-    if (handshake_client_create_request(hsCtx, &request) != HANDSHAKE_SUCCESS) {
-        handshake_free(hsCtx);
+    if (handshake_client_start(&hsCtx, &request) != HANDSHAKE_SUCCESS) {
+        handshake_cleanup(&hsCtx);
         UpdateStatus(L"❌ Échec création requête handshake");
         return false;
     }
@@ -223,14 +223,14 @@ bool DoHandshake() {
     size_t replySize;
     if (icmp_send_reliable(g_session, icmpPayload, 8 + request.payload_size,
                            replyPayload, &replySize) != ICMP_SUCCESS) {
-        handshake_free(hsCtx);
+        handshake_cleanup(&hsCtx);
         UpdateStatus(L"❌ Timeout handshake");
         return false;
     }
     
     proto_packet_t response;
     if (replySize < 8) {
-        handshake_free(hsCtx);
+        handshake_cleanup(&hsCtx);
         UpdateStatus(L"❌ Réponse handshake invalide");
         return false;
     }
@@ -239,14 +239,14 @@ bool DoHandshake() {
     response.payload_size = replySize - 8;
     memcpy(response.payload, replyPayload + 8, response.payload_size);
     
-    if (handshake_client_finish(hsCtx, &response) != HANDSHAKE_SUCCESS) {
-        handshake_free(hsCtx);
+    if (handshake_client_finish(&hsCtx, &response) != HANDSHAKE_SUCCESS) {
+        handshake_cleanup(&hsCtx);
         UpdateStatus(L"❌ Échec finalisation handshake");
         return false;
     }
     
-    handshake_get_session_key(hsCtx, g_sessionKey);
-    handshake_free(hsCtx);
+    handshake_get_session_key(&hsCtx, g_sessionKey);
+    handshake_cleanup(&hsCtx);
     
     g_handshakeComplete = true;
     g_dataSequence = 0;
@@ -512,7 +512,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
         case WM_DESTROY:
             if (g_session) {
-                icmp_destroy_session(g_session);
+                icmp_session_destroy(g_session);
             }
             PostQuitMessage(0);
             return 0;

@@ -20,6 +20,10 @@
 #ifndef HANDSHAKE_H
 #define HANDSHAKE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 #include "../crypto/diffie_hellman.h"
