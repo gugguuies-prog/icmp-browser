@@ -92,6 +92,7 @@ if(PLATFORM_WINDOWS AND BUILD_CLIENT)
     # Simple browser (no WebView2 dependency)
     add_executable(icmp_browser_simple WIN32
         src/browser/icmp_browser_simple.cpp
+        src/browser/html_renderer.cpp
         src/client/icmp_engine.c
         ${COMMON_SOURCES}
         ${CRYPTO_SOURCES}

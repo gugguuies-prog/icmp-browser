@@ -13,9 +13,12 @@
 #include <commctrl.h>
 #include <richedit.h>
 #include <string>
+#include <vector>
 #include <thread>
 #include <sstream>
 #include <cstdio>
+
+#include "html_renderer.h"
 
 // Include C headers
 #include "../client/icmp_engine.h"
@@ -342,19 +345,58 @@ std::string FetchUrl(const std::string& url) {
     
     UpdateStatus(L"✓ Chargement terminé");
     
-    // Extract HTTP from IP/TCP packet
-    // Skip IP header (20 bytes) and TCP header (20 bytes)
-    if (decryptedSize > 40) {
-        return std::string((char*)decrypted + 40, decryptedSize - 40);
+    // Extract HTTP response from IP/TCP packet
+    // IP header: 20 bytes minimum
+    // TCP header: 20 bytes minimum
+    if (decryptedSize < 40) {
+        return "Erreur: Paquet trop petit";
     }
     
-    // Return hex dump if no HTTP data
-    std::stringstream ss;
-    ss << "Réponse reçue (" << decryptedSize << " bytes):\n\n";
-    for (size_t i = 0; i < decryptedSize && i < 512; i++) {
-        ss << (char)decrypted[i];
+    // Skip IP header (check IHL field for actual size)
+    uint8_t ihl = (decrypted[0] & 0x0F) * 4; // IHL is in 32-bit words
+    if (ihl < 20 || ihl > 60) ihl = 20;
+    
+    // Skip TCP header (check data offset for actual size)
+    if (decryptedSize < ihl + 20) {
+        return "Erreur: Paquet TCP invalide";
     }
-    return ss.str();
+    
+    uint8_t tcpDataOffset = ((decrypted[ihl + 12] >> 4) & 0x0F) * 4;
+    if (tcpDataOffset < 20) tcpDataOffset = 20;
+    
+    size_t httpStart = ihl + tcpDataOffset;
+    if (httpStart >= decryptedSize) {
+        return "Erreur: Pas de données HTTP";
+    }
+    
+    // Extract HTTP response
+    std::string httpResponse((char*)decrypted + httpStart, decryptedSize - httpStart);
+    
+    // Parse HTTP response - find the blank line that separates headers from body
+    size_t bodyStart = httpResponse.find("\r\n\r\n");
+    if (bodyStart == std::string::npos) {
+        bodyStart = httpResponse.find("\n\n");
+        if (bodyStart != std::string::npos) {
+            bodyStart += 2;
+        }
+    } else {
+        bodyStart += 4;
+    }
+    
+    if (bodyStart == std::string::npos || bodyStart >= httpResponse.length()) {
+        // No body found, return the whole response
+        return httpResponse;
+    }
+    
+    // Extract only the HTML body
+    std::string htmlBody = httpResponse.substr(bodyStart);
+    
+    // If empty or very small, show the full response for debugging
+    if (htmlBody.length() < 10) {
+        return "Réponse HTTP complète:\n\n" + httpResponse;
+    }
+    
+    return htmlBody;
 }
 
 // Update status bar
@@ -367,7 +409,26 @@ void UpdateStatus(const std::wstring& text) {
 // Set content
 void SetContent(const std::string& text) {
     if (g_hwndContent) {
-        SetWindowTextA(g_hwndContent, text.c_str());
+        // Check if it looks like HTML
+        if (text.find("<html") != std::string::npos || 
+            text.find("<HTML") != std::string::npos ||
+            text.find("<!DOCTYPE") != std::string::npos ||
+            text.find("<head") != std::string::npos ||
+            text.find("<body") != std::string::npos) {
+            
+            // Use HTML renderer
+            HtmlRenderer renderer;
+            auto elements = renderer.Render(text);
+            renderer.ApplyToRichEdit(g_hwndContent, elements);
+            
+            // Update window title with page title
+            std::string title = HtmlRenderer::ExtractTitle(text);
+            std::wstring wtitle = L"ICMP Browser - " + std::wstring(title.begin(), title.end());
+            SetWindowTextW(g_hwndMain, wtitle.c_str());
+        } else {
+            // Plain text
+            SetWindowTextA(g_hwndContent, text.c_str());
+        }
     }
 }
 

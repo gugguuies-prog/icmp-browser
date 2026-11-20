@@ -37,10 +37,10 @@ struct RenderedElement {
     HtmlElementType type;
     std::string text;
     std::string url;  // For links
-    COLORREF color;
-    bool bold;
-    bool italic;
-    int fontSize;
+    COLORREF color = RGB(0, 0, 0);
+    bool bold = false;
+    bool italic = false;
+    int fontSize = 14;
 };
 
 /**

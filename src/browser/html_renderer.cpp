@@ -11,9 +11,11 @@
 #include <regex>
 
 HtmlRenderer::HtmlRenderer() {
+    // Constructor
 }
 
 HtmlRenderer::~HtmlRenderer() {
+    // Destructor
 }
 
 /**
