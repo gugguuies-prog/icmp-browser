@@ -115,9 +115,13 @@ if(PLATFORM_WINDOWS AND BUILD_CLIENT)
             _HAS_EXCEPTIONS=0
         )
         
+        # Use static runtime (/MT) to match CEF
+        set_property(TARGET icmpbrowser PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        
         target_compile_options(icmpbrowser PRIVATE
             /MP
             /W3
+            /MT$<$<CONFIG:Debug>:d>
             /wd4100 /wd4127 /wd4244 /wd4512 /wd4701 /wd4702 /wd4996
         )
         
