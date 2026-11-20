@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(BUILD_TESTS "Build test programs" ON)
 option(BUILD_CLIENT "Build Windows client" ON)
 option(BUILD_SERVER "Build Linux server" ON)
+option(USE_CEF "Use CEF instead of WebView2" ON)
 
 # Platform detection
 if(WIN32)
@@ -19,10 +20,22 @@ else()
     set(PLATFORM_LINUX TRUE)
 endif()
 
+# CEF Configuration
+if(USE_CEF AND PLATFORM_WINDOWS)
+    set(CEF_ROOT "C:/cef" CACHE PATH "Path to CEF root directory")
+    set(CEF_INCLUDE_PATH "${CEF_ROOT}")
+    set(CEF_LIBRARY_DEBUG "${CEF_ROOT}/Debug/libcef.lib")
+    set(CEF_LIBRARY_RELEASE "${CEF_ROOT}/Release/libcef.lib")
+    set(CEF_DLL_WRAPPER_DEBUG "${CEF_ROOT}/build/libcef_dll_wrapper/Debug/libcef_dll_wrapper.lib")
+    set(CEF_DLL_WRAPPER_RELEASE "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.lib")
+    
+    message(STATUS "Using CEF from: ${CEF_ROOT}")
+endif()
+
 # Find required packages
-if(PLATFORM_WINDOWS)
+if(PLATFORM_WINDOWS AND NOT USE_CEF)
     # WebView2 SDK (installed via vcpkg)
-    find_package(unofficial-webview2 CONFIG REQUIRED)
+    find_package(unofficial-webview2 CONFIG QUIET)
 endif()
 
 find_package(OpenSSL REQUIRED)
@@ -54,40 +67,114 @@ set(CRYPTO_SOURCES
 # ============================================================================
 if(PLATFORM_WINDOWS AND BUILD_CLIENT)
     
-    # Client sources
-    set(CLIENT_SOURCES
-        src/client/icmp_engine.c
-        src/client/http_proxy.c
-        src/client/main.cpp
-        src/client/ui/main_window.cpp
-        src/client/ui/webview_controller.cpp
-        src/client/ui/status_bar.cpp
-        src/client/ui/settings_dialog.cpp
-    )
-    
-    add_executable(icmpbrowser WIN32
-        ${CLIENT_SOURCES}
-        ${COMMON_SOURCES}
-        ${CRYPTO_SOURCES}
-    )
-    
-    target_link_libraries(icmpbrowser PRIVATE
-        ${OPENSSL_LIBRARIES}
-        ${ZLIB_LIBRARIES}
-        Threads::Threads
-        iphlpapi
-        ws2_32
-        comctl32
-        unofficial::webview2::webview2
-    )
-    
-    # Set subsystem to Windows
-    set_target_properties(icmpbrowser PROPERTIES
-        WIN32_EXECUTABLE TRUE
-        LINK_FLAGS "/SUBSYSTEM:WINDOWS"
-    )
-    
-    message(STATUS "Building Windows client: icmpbrowser.exe")
+    if(USE_CEF)
+        # CEF Browser
+        add_executable(icmpbrowser WIN32
+            src/browser/cef_browser.cpp
+            src/client/icmp_engine.c
+            ${COMMON_SOURCES}
+            ${CRYPTO_SOURCES}
+        )
+        
+        target_include_directories(icmpbrowser PRIVATE
+            ${CEF_INCLUDE_PATH}
+        )
+        
+        target_link_libraries(icmpbrowser PRIVATE
+            debug ${CEF_LIBRARY_DEBUG}
+            optimized ${CEF_LIBRARY_RELEASE}
+            debug ${CEF_DLL_WRAPPER_DEBUG}
+            optimized ${CEF_DLL_WRAPPER_RELEASE}
+            ${OPENSSL_LIBRARIES}
+            ${ZLIB_LIBRARIES}
+            Threads::Threads
+            iphlpapi
+            ws2_32
+            comctl32
+            shlwapi
+            dbghelp
+            psapi
+            version
+            winmm
+            propsys
+        )
+        
+        # CEF-specific compiler flags
+        target_compile_definitions(icmpbrowser PRIVATE
+            WIN32
+            _WIN32
+            _WINDOWS
+            UNICODE
+            _UNICODE
+            NOMINMAX
+            WIN32_LEAN_AND_MEAN
+            _HAS_EXCEPTIONS=0
+        )
+        
+        target_compile_options(icmpbrowser PRIVATE
+            /MP
+            /W3
+            /wd4100 /wd4127 /wd4244 /wd4512 /wd4701 /wd4702 /wd4996
+        )
+        
+        set_target_properties(icmpbrowser PROPERTIES
+            WIN32_EXECUTABLE TRUE
+            LINK_FLAGS "/SUBSYSTEM:WINDOWS /MANIFEST:NO"
+        )
+        
+        # Copy CEF binaries
+        add_custom_command(TARGET icmpbrowser POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CEF_ROOT}/Release/libcef.dll"
+                "$<TARGET_FILE_DIR:icmpbrowser>"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CEF_ROOT}/Release/chrome_elf.dll"
+                "$<TARGET_FILE_DIR:icmpbrowser>"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CEF_ROOT}/Resources"
+                "$<TARGET_FILE_DIR:icmpbrowser>"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CEF_ROOT}/Release"
+                "$<TARGET_FILE_DIR:icmpbrowser>"
+        )
+        
+        message(STATUS "Building CEF browser: icmpbrowser.exe")
+        
+    else()
+        # WebView2 Browser
+        set(CLIENT_SOURCES
+            src/client/icmp_engine.c
+            src/client/http_proxy.c
+            src/client/main.cpp
+            src/client/ui/main_window.cpp
+            src/client/ui/webview_controller.cpp
+            src/client/ui/status_bar.cpp
+            src/client/ui/settings_dialog.cpp
+        )
+        
+        add_executable(icmpbrowser WIN32
+            ${CLIENT_SOURCES}
+            ${COMMON_SOURCES}
+            ${CRYPTO_SOURCES}
+        )
+        
+        target_link_libraries(icmpbrowser PRIVATE
+            ${OPENSSL_LIBRARIES}
+            ${ZLIB_LIBRARIES}
+            Threads::Threads
+            iphlpapi
+            ws2_32
+            comctl32
+            unofficial::webview2::webview2
+        )
+        
+        set_target_properties(icmpbrowser PROPERTIES
+            WIN32_EXECUTABLE TRUE
+            LINK_FLAGS "/SUBSYSTEM:WINDOWS"
+        )
+        
+        message(STATUS "Building WebView2 browser: icmpbrowser.exe")
+    endif()
     
     # Simple browser (no WebView2 dependency)
     add_executable(icmp_browser_simple WIN32

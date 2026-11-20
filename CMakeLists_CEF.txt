@@ -1,0 +1,124 @@
+# CMakeLists.txt for ICMP Browser with CEF
+cmake_minimum_required(VERSION 3.15)
+project(ICMPBrowserCEF VERSION 1.0.0 LANGUAGES C CXX)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# CEF Configuration
+set(CEF_ROOT "C:/cef" CACHE PATH "Path to CEF root directory")
+
+# Set CEF library paths
+set(CEF_INCLUDE_PATH "${CEF_ROOT}/include")
+set(CEF_LIBRARY_DEBUG "${CEF_ROOT}/Debug/libcef.lib")
+set(CEF_LIBRARY_RELEASE "${CEF_ROOT}/Release/libcef.lib")
+set(CEF_DLL_WRAPPER_DEBUG "${CEF_ROOT}/build/libcef_dll_wrapper/Debug/libcef_dll_wrapper.lib")
+set(CEF_DLL_WRAPPER_RELEASE "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.lib")
+
+# Find OpenSSL
+find_package(OpenSSL REQUIRED)
+
+# Include directories
+include_directories(
+    ${CMAKE_SOURCE_DIR}/src
+    ${CEF_INCLUDE_PATH}
+    ${OPENSSL_INCLUDE_DIR}
+)
+
+# Common sources
+set(COMMON_SOURCES
+    src/common/protocol.c
+    src/common/handshake.c
+    src/common/compression.c
+)
+
+# Crypto sources
+set(CRYPTO_SOURCES
+    src/crypto/aes_gcm.c
+    src/crypto/diffie_hellman.c
+)
+
+# Client ICMP engine
+set(CLIENT_SOURCES
+    src/client/icmp_engine.c
+)
+
+# CEF Browser executable
+add_executable(icmpbrowser WIN32
+    src/browser/cef_browser.cpp
+    ${CLIENT_SOURCES}
+    ${COMMON_SOURCES}
+    ${CRYPTO_SOURCES}
+)
+
+# Link libraries
+target_link_libraries(icmpbrowser PRIVATE
+    debug ${CEF_LIBRARY_DEBUG}
+    optimized ${CEF_LIBRARY_RELEASE}
+    debug ${CEF_DLL_WRAPPER_DEBUG}
+    optimized ${CEF_DLL_WRAPPER_RELEASE}
+    ${OPENSSL_LIBRARIES}
+    comctl32
+    iphlpapi
+    ws2_32
+    shlwapi
+    dbghelp
+    psapi
+    version
+    winmm
+    propsys
+)
+
+# CEF requires specific compiler flags
+if(MSVC)
+    target_compile_definitions(icmpbrowser PRIVATE
+        WIN32
+        _WIN32
+        _WINDOWS
+        UNICODE
+        _UNICODE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        _HAS_EXCEPTIONS=0
+    )
+    
+    target_compile_options(icmpbrowser PRIVATE
+        /MP          # Multi-processor compilation
+        /W3          # Warning level 3
+        /wd4100      # Unreferenced formal parameter
+        /wd4127      # Conditional expression is constant
+        /wd4244      # Conversion warning
+        /wd4512      # Assignment operator could not be generated
+        /wd4701      # Potentially uninitialized local variable
+        /wd4702      # Unreachable code
+        /wd4996      # Deprecated function
+    )
+    
+    set_target_properties(icmpbrowser PROPERTIES
+        LINK_FLAGS "/SUBSYSTEM:WINDOWS /MANIFEST:NO"
+    )
+endif()
+
+# Copy CEF binaries to output directory
+add_custom_command(TARGET icmpbrowser POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CEF_ROOT}/Release/libcef.dll"
+        "$<TARGET_FILE_DIR:icmpbrowser>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CEF_ROOT}/Release/chrome_elf.dll"
+        "$<TARGET_FILE_DIR:icmpbrowser>"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CEF_ROOT}/Resources"
+        "$<TARGET_FILE_DIR:icmpbrowser>"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CEF_ROOT}/Release"
+        "$<TARGET_FILE_DIR:icmpbrowser>"
+)
+
+message(STATUS "========================================")
+message(STATUS "ICMP Browser with CEF")
+message(STATUS "========================================")
+message(STATUS "CEF Root: ${CEF_ROOT}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "========================================")
