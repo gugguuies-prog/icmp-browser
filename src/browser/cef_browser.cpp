@@ -7,6 +7,11 @@
 
 #include <winsock2.h>
 #include <windows.h>
+
+// Undefine Windows macros that conflict with CEF
+#undef GetNextSibling
+#undef GetFirstChild
+
 #include <windowsx.h>
 #include <string>
 #include <sstream>
@@ -50,7 +55,7 @@ static HWND g_backBtn = NULL;
 static HWND g_fwdBtn = NULL;
 static HWND g_refreshBtn = NULL;
 static HWND g_settingsBtn = NULL;
-static CefRefPtr<CefBrowser> g_browser = NULL;
+static CefRefPtr<CefBrowser> g_browser = nullptr;
 static std::string g_serverIp = "192.168.1.40";
 static icmp_session_t* g_session = NULL;
 static uint8_t g_sessionKey[32];
@@ -286,9 +291,8 @@ void CreateModernUI(HWND hwnd) {
     // Create CEF browser
     CefWindowInfo window_info;
     GetClientRect(hwnd, &rcClient);
-    RECT rect = rcClient;
-    rect.top = 56;
-    window_info.SetAsChild(hwnd, rect);
+    CefRect cef_rect(0, 56, rcClient.right, rcClient.bottom);
+    window_info.SetAsChild(hwnd, cef_rect);
     window_info.style = WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 
     CefBrowserSettings browser_settings;
