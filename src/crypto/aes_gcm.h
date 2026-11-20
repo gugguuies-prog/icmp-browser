@@ -17,6 +17,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 // Constants
 #define AES_GCM_KEY_SIZE 32      // 256 bits
 #define AES_GCM_IV_SIZE 12       // 96 bits (recommended for GCM)
@@ -125,5 +130,9 @@ int aes_gcm_generate_key(uint8_t *key);
  * @return Human-readable error message
  */
 const char* aes_gcm_error_string(int error_code);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // AES_GCM_H

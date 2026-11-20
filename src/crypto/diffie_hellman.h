@@ -16,6 +16,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 // Constants
 #define DH_KEY_SIZE 256          // 2048 bits in bytes
 #define DH_PUBKEY_SIZE 256       // Public key size (2048 bits)
@@ -189,5 +194,9 @@ int dh_cleanup(dh_context_t *ctx);
  * @return Human-readable error message
  */
 const char* dh_error_string(int error_code);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // DIFFIE_HELLMAN_H

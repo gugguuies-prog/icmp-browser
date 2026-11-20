@@ -24,6 +24,10 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 #include <time.h>
@@ -274,5 +278,9 @@ const char* proto_type_string(uint8_t type);
  * @return Human-readable error message
  */
 const char* proto_error_string(int error_code);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // PROTOCOL_H

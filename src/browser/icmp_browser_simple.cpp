@@ -18,12 +18,10 @@
 #include <cstdio>
 
 // Include C headers
-extern "C" {
 #include "../client/icmp_engine.h"
 #include "../common/protocol.h"
 #include "../common/handshake.h"
 #include "../crypto/aes_gcm.h"
-}
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "ws2_32.lib")
