@@ -208,26 +208,26 @@ bool ParseUrl(const std::string& url, std::string& host, std::string& path) {
 bool DoHandshake() {
     if (g_handshakeComplete) return true;
     
-    UpdateStatus(L"Établissement de la connexion sécurisée...");
+    UpdateStatus(L"Etablissement de la connexion securisee...");
     
     if (!g_session) {
         g_session = icmp_session_create(g_serverIp.c_str());
         if (!g_session) {
-            UpdateStatus(L"❌ Impossible de créer la session ICMP");
+            UpdateStatus(L"[X] Impossible de creer la session ICMP");
             return false;
         }
     }
     
     handshake_context_t hsCtx;
     if (handshake_init(&hsCtx, g_session->session_id) != HANDSHAKE_SUCCESS) {
-        UpdateStatus(L"❌ Échec initialisation handshake");
+        UpdateStatus(L"[X] Echec initialisation handshake");
         return false;
     }
     
     proto_packet_t request;
     if (handshake_client_start(&hsCtx, &request) != HANDSHAKE_SUCCESS) {
         handshake_cleanup(&hsCtx);
-        UpdateStatus(L"❌ Échec création requête handshake");
+        UpdateStatus(L"[X] Echec creation requete handshake");
         return false;
     }
     
@@ -240,14 +240,14 @@ bool DoHandshake() {
     if (icmp_send_reliable(g_session, icmpPayload, 8 + request.payload_size,
                            replyPayload, &replySize) != ICMP_SUCCESS) {
         handshake_cleanup(&hsCtx);
-        UpdateStatus(L"❌ Timeout handshake");
+        UpdateStatus(L"[X] Timeout handshake");
         return false;
     }
     
     proto_packet_t response;
     if (replySize < 8) {
         handshake_cleanup(&hsCtx);
-        UpdateStatus(L"❌ Réponse handshake invalide");
+        UpdateStatus(L"[X] Reponse handshake invalide");
         return false;
     }
     
@@ -257,7 +257,7 @@ bool DoHandshake() {
     
     if (handshake_client_finish(&hsCtx, &response) != HANDSHAKE_SUCCESS) {
         handshake_cleanup(&hsCtx);
-        UpdateStatus(L"❌ Échec finalisation handshake");
+        UpdateStatus(L"[X] Echec finalisation handshake");
         return false;
     }
     
@@ -267,7 +267,7 @@ bool DoHandshake() {
     g_handshakeComplete = true;
     g_dataSequence = 0;
     
-    UpdateStatus(L"✓ Connexion sécurisée établie");
+    UpdateStatus(L"[OK] Connexion securisee etablie");
     return true;
 }
 
@@ -343,7 +343,7 @@ std::string FetchUrl(const std::string& url) {
     
     g_dataSequence++;
     
-    UpdateStatus(L"✓ Chargement terminé");
+    UpdateStatus(L"[OK] Chargement termine");
     
     // Extract HTTP response from IP/TCP packet
     // IP header: 20 bytes minimum
@@ -402,7 +402,15 @@ std::string FetchUrl(const std::string& url) {
 // Update status bar
 void UpdateStatus(const std::wstring& text) {
     if (g_hwndStatus) {
-        SetWindowTextW(g_hwndStatus, text.c_str());
+        // Replace special characters that might not render well
+        std::wstring cleanText = text;
+        // Replace • with -
+        for (size_t i = 0; i < cleanText.length(); i++) {
+            if (cleanText[i] > 127) {
+                cleanText[i] = L'-';
+            }
+        }
+        SetWindowTextW(g_hwndStatus, cleanText.c_str());
     }
 }
 
@@ -540,51 +548,55 @@ void CreateUI(HWND hwnd) {
     int y = margin;
     int x = margin;
     
-    // Back button (Unicode: ◄ = 0x25C4)
-    g_hwndBackBtn = CreateWindowExW(0, L"BUTTON", L"🡐",
+    // Back button - simple <
+    g_hwndBackBtn = CreateWindowExW(0, L"BUTTON", L"<",
                                      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                      x, y, btnSize, btnSize,
                                      hwnd, (HMENU)ID_BACK_BUTTON, NULL, NULL);
     SendMessage(g_hwndBackBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     x += btnSize + 5;
     
-    // Forward button (Unicode: ► = 0x25BA)
-    g_hwndFwdBtn = CreateWindowExW(0, L"BUTTON", L"🡒",
+    // Forward button - simple >
+    g_hwndFwdBtn = CreateWindowExW(0, L"BUTTON", L">",
                                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                     x, y, btnSize, btnSize,
                                     hwnd, (HMENU)ID_FWD_BUTTON, NULL, NULL);
     SendMessage(g_hwndFwdBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     x += btnSize + 5;
     
-    // Refresh button (Unicode: ⟳ = 0x27F3)
-    g_hwndRefreshBtn = CreateWindowExW(0, L"BUTTON", L"🗘",
+    // Refresh button - ↻
+    g_hwndRefreshBtn = CreateWindowExW(0, L"BUTTON", L"↻",
                                         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                         x, y, btnSize, btnSize,
                                         hwnd, (HMENU)ID_REFRESH_BTN, NULL, NULL);
     SendMessage(g_hwndRefreshBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     x += btnSize + 10;
     
+    // Calculate remaining space properly
+    int settingsBtnWidth = btnSize;
+    int goBtnWidth = 50; // Make Go button wider
+    int urlBarWidth = rc.right - x - goBtnWidth - settingsBtnWidth - margin * 2 - 15;
+    
     // URL bar
-    int urlWidth = rc.right - x - btnSize * 2 - margin * 2 - 10;
     g_hwndUrlBar = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"http://example.com",
                                     WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                                    x, y, urlWidth, btnSize,
+                                    x, y, urlBarWidth, btnSize,
                                     hwnd, (HMENU)ID_URL_BAR, NULL, NULL);
     SendMessage(g_hwndUrlBar, WM_SETFONT, (WPARAM)hFont, TRUE);
-    x += urlWidth + 5;
+    x += urlBarWidth + 5;
     
-    // Go button
-    g_hwndGoBtn = CreateWindowExW(0, L"BUTTON", L"🡒",
+    // Go button - wider with text "GO"
+    g_hwndGoBtn = CreateWindowExW(0, L"BUTTON", L"GO",
                                    WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-                                   x, y, btnSize, btnSize,
+                                   x, y, goBtnWidth, btnSize,
                                    hwnd, (HMENU)ID_GO_BUTTON, NULL, NULL);
     SendMessage(g_hwndGoBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
-    x += btnSize + 5;
+    x += goBtnWidth + 5;
     
-    // Settings button
-    HWND hSettingsBtn = CreateWindowExW(0, L"BUTTON", L"⚙",
+    // Settings button - ⚙ or just "..."
+    HWND hSettingsBtn = CreateWindowExW(0, L"BUTTON", L"⋮",
                                          WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                                         x, y, btnSize, btnSize,
+                                         x, y, settingsBtnWidth, btnSize,
                                          hwnd, (HMENU)ID_SETTINGS_BTN, NULL, NULL);
     SendMessage(hSettingsBtn, WM_SETFONT, (WPARAM)hFont, TRUE);
     
@@ -599,9 +611,11 @@ void CreateUI(HWND hwnd) {
                                      hwnd, (HMENU)ID_CONTENT, NULL, NULL);
     SendMessage(g_hwndContent, WM_SETFONT, (WPARAM)hFont, TRUE);
     
-    // Status bar
-    std::wstring statusText = L"Prêt • Serveur: ";
-    statusText += std::wstring(g_serverIp.begin(), g_serverIp.end());
+    // Status bar - fix encoding
+    std::wstring statusText = L"Pret • Serveur: ";
+    for (char c : g_serverIp) {
+        statusText += (wchar_t)c;
+    }
     
     g_hwndStatus = CreateWindowExW(0, L"STATIC", statusText.c_str(),
                                     WS_CHILD | WS_VISIBLE | SS_LEFT,
