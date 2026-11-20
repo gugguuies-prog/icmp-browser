@@ -107,6 +107,9 @@ static int handle_handshake(icmp_server_t *server, icmp_session_info_t *session,
                              const struct sockaddr_in *client_addr) {
     LOG_VERBOSE("[Server] Processing handshake request for session 0x%04x\n", session->session_id);
     
+    // Reset data sequence counter on new handshake (session restart)
+    session->data_sequence_counter = 0;
+    
     // Initialize handshake context for this session
     handshake_context_t hs_ctx;
     if (handshake_init(&hs_ctx, session->session_id) != HANDSHAKE_SUCCESS) {
