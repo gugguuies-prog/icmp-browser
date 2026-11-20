@@ -4,7 +4,11 @@ project(ICMPBrowser VERSION 1.0.0 LANGUAGES C CXX)
 
 # C/C++ Standards
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
+if(USE_CEF)
+    set(CMAKE_CXX_STANDARD 20)  # CEF requires C++20
+else()
+    set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Options
