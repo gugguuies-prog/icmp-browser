@@ -201,4 +201,8 @@ const char* handshake_error_string(int error_code);
  */
 const char* handshake_state_string(handshake_state_t state);
 
+#ifdef __cplusplus
+}
+#endif
+
 #endif // HANDSHAKE_H
