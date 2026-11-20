@@ -8,6 +8,7 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <windowsx.h>
+#include <time.h>
 
 // Undefine Windows macros that conflict with CEF BEFORE including CEF headers
 #ifdef GetNextSibling
@@ -36,10 +37,13 @@ extern "C" {
 #include "../client/icmp_engine.h"
 #include "../common/protocol.h"
 #include "../common/handshake.h"
+#include "../crypto/aes_gcm.h"
+#include "../crypto/diffie_hellman.h"
 }
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "iphlpapi.lib")
 
 // Control IDs
 #define ID_URL_BAR      1001
@@ -209,6 +213,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_CLOSE:
+            // Cleanup ICMP session
+            if (g_session) {
+                icmp_session_destroy(g_session);
+                g_session = NULL;
+                g_handshakeComplete = false;
+            }
+            
             if (g_browser) {
                 g_browser->GetHost()->CloseBrowser(true);  // Force close
             } else {
@@ -391,14 +402,112 @@ void OnRefresh() {
 }
 
 void OnSettings() {
-    MessageBoxA(g_hwnd,
-        ("Server: " + g_serverIp).c_str(),
-        "Settings",
-        MB_OK | MB_ICONINFORMATION);
+    char buffer[256];
+    sprintf_s(buffer, sizeof(buffer), 
+             "Current Server: %s\n\n"
+             "Session: %s\n"
+             "Packets Sent: %u\n"
+             "Packets Received: %u",
+             g_serverIp.c_str(),
+             g_handshakeComplete ? "Connected" : "Not connected",
+             g_session ? g_session->packets_sent : 0,
+             g_session ? g_session->packets_received : 0);
+    
+    MessageBoxA(g_hwnd, buffer, "ICMP Browser Settings", MB_OK | MB_ICONINFORMATION);
 }
 
-std::string FetchViaICMP(const std::string& url) {
-    // Parse URL to get host
+// Helper functions for ICMP communication
+static bool InitializeICMPSession() {
+    if (g_session != NULL) {
+        return true; // Already initialized
+    }
+    
+    // Create ICMP session
+    g_session = icmp_session_create(g_serverIp.c_str());
+    if (!g_session) {
+        MessageBoxA(g_hwnd, "Failed to create ICMP session", "Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+    
+    // Perform Diffie-Hellman handshake
+    dh_context_t dh_ctx;
+    if (dh_init(&dh_ctx) != 0) {
+        MessageBoxA(g_hwnd, "Failed to initialize Diffie-Hellman", "Error", MB_OK | MB_ICONERROR);
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+        return false;
+    }
+    
+    uint8_t public_key[DH_PUBLIC_KEY_SIZE];
+    if (dh_generate_keypair(&dh_ctx, public_key, DH_PUBLIC_KEY_SIZE) != 0) {
+        MessageBoxA(g_hwnd, "Failed to generate DH keypair", "Error", MB_OK | MB_ICONERROR);
+        dh_cleanup(&dh_ctx);
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+        return false;
+    }
+    
+    // Create handshake packet
+    uint8_t handshake_packet[512];
+    size_t packet_size = create_handshake_packet(public_key, DH_PUBLIC_KEY_SIZE,
+                                                  handshake_packet, sizeof(handshake_packet));
+    
+    if (packet_size == 0) {
+        MessageBoxA(g_hwnd, "Failed to create handshake packet", "Error", MB_OK | MB_ICONERROR);
+        dh_cleanup(&dh_ctx);
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+        return false;
+    }
+    
+    // Send handshake
+    uint8_t reply[512];
+    size_t reply_size = 0;
+    int result = icmp_send_reliable(g_session, handshake_packet, packet_size, reply, &reply_size);
+    
+    if (result != ICMP_SUCCESS) {
+        char error[256];
+        sprintf_s(error, "Handshake failed: %s", icmp_error_string(result));
+        MessageBoxA(g_hwnd, error, "Error", MB_OK | MB_ICONERROR);
+        dh_cleanup(&dh_ctx);
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+        return false;
+    }
+    
+    // Parse handshake response
+    uint8_t server_public_key[DH_PUBLIC_KEY_SIZE];
+    if (parse_handshake_response(reply, reply_size, server_public_key, DH_PUBLIC_KEY_SIZE) != 0) {
+        MessageBoxA(g_hwnd, "Failed to parse handshake response", "Error", MB_OK | MB_ICONERROR);
+        dh_cleanup(&dh_ctx);
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+        return false;
+    }
+    
+    // Compute shared secret
+    if (dh_compute_shared_secret(&dh_ctx, server_public_key, DH_PUBLIC_KEY_SIZE,
+                                  g_sessionKey, sizeof(g_sessionKey)) != 0) {
+        MessageBoxA(g_hwnd, "Failed to compute shared secret", "Error", MB_OK | MB_ICONERROR);
+        dh_cleanup(&dh_ctx);
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+        return false;
+    }
+    
+    dh_cleanup(&dh_ctx);
+    g_handshakeComplete = true;
+    
+    return true;
+}
+
+static std::string FetchViaICMP(const std::string& url) {
+    // Initialize ICMP session if needed
+    if (!InitializeICMPSession()) {
+        return "<html><body><h1>Error</h1><p>Failed to initialize ICMP tunnel</p></body></html>";
+    }
+    
+    // Parse URL to get host and path
     std::string host;
     std::string path = "/";
     
@@ -423,18 +532,141 @@ std::string FetchViaICMP(const std::string& url) {
     oss << "Host: " << host << "\r\n";
     oss << "Connection: close\r\n";
     oss << "User-Agent: ICMP-Browser/1.0\r\n";
+    oss << "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
     oss << "\r\n";
     
     std::string http_request = oss.str();
     
-    // Create IP packet with HTTP request (simplified - real implementation would be more complex)
-    uint8_t request_data[2048];
-    memcpy(request_data, http_request.c_str(), http_request.size());
+    // Create simple IP packet structure (minimal for demonstration)
+    // In reality, you'd need full IP/TCP header construction
+    uint8_t request_packet[2048];
+    size_t request_size = http_request.size();
     
-    // TODO: Send via ICMP tunnel and get response
-    // For now, return a placeholder
+    if (request_size > sizeof(request_packet)) {
+        return "<html><body><h1>Error</h1><p>Request too large</p></body></html>";
+    }
     
-    return "<html><body><h1>ICMP Fetch</h1><p>URL: " + url + "</p><p>Host: " + host + "</p><p>Path: " + path + "</p><p><i>ICMP tunnel integration in progress...</i></p></body></html>";
+    memcpy(request_packet, http_request.c_str(), request_size);
+    
+    // Encrypt the packet
+    uint8_t encrypted_packet[2048];
+    size_t encrypted_size = 0;
+    
+    // Use session ID and sequence for AAD
+    uint8_t aad[4];
+    aad[0] = (g_session->session_id >> 8) & 0xFF;
+    aad[1] = g_session->session_id & 0xFF;
+    aad[2] = (g_session->sequence_counter >> 8) & 0xFF;
+    aad[3] = g_session->sequence_counter & 0xFF;
+    
+    uint8_t iv[12];
+    for (int i = 0; i < 12; i++) {
+        iv[i] = rand() % 256;
+    }
+    
+    uint8_t tag[16];
+    
+    if (aes_gcm_encrypt(g_sessionKey, sizeof(g_sessionKey),
+                        iv, sizeof(iv),
+                        aad, sizeof(aad),
+                        request_packet, request_size,
+                        encrypted_packet, &encrypted_size,
+                        tag, sizeof(tag)) != 0) {
+        return "<html><body><h1>Error</h1><p>Encryption failed</p></body></html>";
+    }
+    
+    // Create protocol packet
+    uint8_t protocol_packet[2048];
+    protocol_header_t* header = (protocol_header_t*)protocol_packet;
+    header->version = PROTOCOL_VERSION;
+    header->type = PACKET_TYPE_DATA;
+    header->flags = 0;
+    header->session_id = htons(g_session->session_id);
+    header->sequence = htons(g_session->sequence_counter);
+    header->payload_length = htons((uint16_t)encrypted_size);
+    
+    // Copy IV, tag, and encrypted data
+    memcpy(header->iv, iv, sizeof(iv));
+    memcpy(header->tag, tag, sizeof(tag));
+    memcpy(protocol_packet + sizeof(protocol_header_t), encrypted_packet, encrypted_size);
+    
+    size_t total_size = sizeof(protocol_header_t) + encrypted_size;
+    
+    // Send via ICMP
+    uint8_t response[8192]; // Larger buffer for HTTP response
+    size_t response_size = 0;
+    
+    int result = icmp_send_reliable(g_session, protocol_packet, total_size, response, &response_size);
+    
+    if (result != ICMP_SUCCESS) {
+        char error[512];
+        sprintf_s(error, sizeof(error), 
+                 "<html><body><h1>Error</h1><p>ICMP send failed: %s</p><p>URL: %s</p></body></html>",
+                 icmp_error_string(result), url.c_str());
+        return std::string(error);
+    }
+    
+    if (response_size < sizeof(protocol_header_t)) {
+        return "<html><body><h1>Error</h1><p>Invalid response (too small)</p></body></html>";
+    }
+    
+    // Parse response
+    protocol_header_t* resp_header = (protocol_header_t*)response;
+    
+    if (resp_header->version != PROTOCOL_VERSION) {
+        return "<html><body><h1>Error</h1><p>Invalid protocol version</p></body></html>";
+    }
+    
+    if (resp_header->type != PACKET_TYPE_DATA) {
+        return "<html><body><h1>Error</h1><p>Invalid packet type</p></body></html>";
+    }
+    
+    uint16_t payload_len = ntohs(resp_header->payload_length);
+    
+    if (response_size < sizeof(protocol_header_t) + payload_len) {
+        return "<html><body><h1>Error</h1><p>Invalid response (payload truncated)</p></body></html>";
+    }
+    
+    // Decrypt response
+    uint8_t decrypted[8192];
+    size_t decrypted_size = 0;
+    
+    // Reconstruct AAD for response
+    uint8_t resp_aad[4];
+    resp_aad[0] = (ntohs(resp_header->session_id) >> 8) & 0xFF;
+    resp_aad[1] = ntohs(resp_header->session_id) & 0xFF;
+    resp_aad[2] = (ntohs(resp_header->sequence) >> 8) & 0xFF;
+    resp_aad[3] = ntohs(resp_header->sequence) & 0xFF;
+    
+    if (aes_gcm_decrypt(g_sessionKey, sizeof(g_sessionKey),
+                        resp_header->iv, sizeof(resp_header->iv),
+                        resp_aad, sizeof(resp_aad),
+                        response + sizeof(protocol_header_t), payload_len,
+                        resp_header->tag, sizeof(resp_header->tag),
+                        decrypted, &decrypted_size) != 0) {
+        return "<html><body><h1>Error</h1><p>Decryption failed</p></body></html>";
+    }
+    
+    // Extract HTML from HTTP response
+    std::string http_response((char*)decrypted, decrypted_size);
+    
+    // Find the end of HTTP headers (double CRLF)
+    size_t body_start = http_response.find("\r\n\r\n");
+    if (body_start == std::string::npos) {
+        body_start = http_response.find("\n\n");
+        if (body_start != std::string::npos) {
+            body_start += 2;
+        }
+    } else {
+        body_start += 4;
+    }
+    
+    if (body_start != std::string::npos && body_start < http_response.length()) {
+        return http_response.substr(body_start);
+    }
+    
+    // If no body separator found, return the whole response
+    return http_response;
 }
 
 // CEF App
@@ -470,6 +702,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     // Initialize Winsock
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
+    
+    // Get server IP from command line
+    if (__argc > 1) {
+        g_serverIp = __argv[1];
+    }
+    
+    // Seed random for IV generation
+    srand((unsigned int)time(NULL));
 
     // Register window class
     WNDCLASSW wc = {};
@@ -501,6 +741,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     }
 
     // Cleanup
+    if (g_session) {
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+    }
+    
     CefShutdown();
     WSACleanup();
 
