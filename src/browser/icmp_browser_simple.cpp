@@ -280,8 +280,12 @@ std::string FetchUrl(const std::string& url) {
     
     UpdateStatus((L"Chargement de " + std::wstring(url.begin(), url.end()) + L"...").c_str());
     
+    // Reset handshake for each new request to ensure clean state
+    g_handshakeComplete = false;
+    
+    // Perform handshake if needed
     if (!DoHandshake()) {
-        return "Erreur de connexion: Impossible d'établir la connexion sécurisée avec le serveur ICMP";
+        return "Erreur de connexion: Impossible d'etablir la connexion securisee avec le serveur ICMP";
     }
     
     // Create HTTP packet
@@ -655,11 +659,38 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int margin = 10;
             int toolbarHeight = 50;
             int btnSize = 35;
+            int goBtnWidth = 50;
+            int settingsBtnWidth = 35;
             
-            // Resize URL bar
-            int urlX = margin + btnSize * 3 + 20;
-            int urlWidth = rc.right - urlX - btnSize - margin * 2 - 5;
-            SetWindowPos(g_hwndUrlBar, NULL, urlX, margin, urlWidth, btnSize, SWP_NOZORDER);
+            // Reposition all toolbar buttons
+            int x = margin;
+            
+            // Back button
+            SetWindowPos(g_hwndBackBtn, NULL, x, margin, btnSize, btnSize, SWP_NOZORDER);
+            x += btnSize + 5;
+            
+            // Forward button
+            SetWindowPos(g_hwndFwdBtn, NULL, x, margin, btnSize, btnSize, SWP_NOZORDER);
+            x += btnSize + 5;
+            
+            // Refresh button
+            SetWindowPos(g_hwndRefreshBtn, NULL, x, margin, btnSize, btnSize, SWP_NOZORDER);
+            x += btnSize + 10;
+            
+            // URL bar
+            int urlWidth = rc.right - x - goBtnWidth - settingsBtnWidth - margin * 2 - 15;
+            SetWindowPos(g_hwndUrlBar, NULL, x, margin, urlWidth, btnSize, SWP_NOZORDER);
+            x += urlWidth + 5;
+            
+            // Go button
+            SetWindowPos(g_hwndGoBtn, NULL, x, margin, goBtnWidth, btnSize, SWP_NOZORDER);
+            x += goBtnWidth + 5;
+            
+            // Settings button
+            HWND hSettingsBtn = GetDlgItem(hwnd, ID_SETTINGS_BTN);
+            if (hSettingsBtn) {
+                SetWindowPos(hSettingsBtn, NULL, x, margin, settingsBtnWidth, btnSize, SWP_NOZORDER);
+            }
             
             // Resize content
             SetWindowPos(g_hwndContent, NULL, margin, toolbarHeight + margin,
