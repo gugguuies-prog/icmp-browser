@@ -474,7 +474,7 @@ static bool InitializeICMPSession() {
     }
     
     // Complete handshake
-    if (handshake_client_complete(&hs_ctx, &response) != 0) {
+    if (handshake_client_finish(&hs_ctx, &response) != 0) {
         MessageBoxA(g_hwnd, "Failed to complete handshake", "Error", MB_OK | MB_ICONERROR);
         handshake_cleanup(&hs_ctx);
         icmp_session_destroy(g_session);
