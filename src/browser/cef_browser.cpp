@@ -116,6 +116,8 @@ public:
 
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {
         g_browser = nullptr;
+        // Post quit message to close the application
+        PostQuitMessage(0);
     }
 
     // CefLoadHandler methods
@@ -208,7 +210,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         case WM_CLOSE:
             if (g_browser) {
-                g_browser->GetHost()->CloseBrowser(false);
+                g_browser->GetHost()->CloseBrowser(true);  // Force close
+            } else {
+                DestroyWindow(hwnd);
             }
             return 0;
 
