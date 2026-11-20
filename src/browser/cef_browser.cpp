@@ -7,12 +7,22 @@
 
 #include <winsock2.h>
 #include <windows.h>
-
-// Undefine Windows macros that conflict with CEF
-#undef GetNextSibling
-#undef GetFirstChild
-
 #include <windowsx.h>
+
+// Undefine Windows macros that conflict with CEF BEFORE including CEF headers
+#ifdef GetNextSibling
+#undef GetNextSibling
+#endif
+#ifdef GetFirstChild
+#undef GetFirstChild
+#endif
+#ifdef GetPrevSibling
+#undef GetPrevSibling
+#endif
+#ifdef GetParent
+#undef GetParent
+#endif
+
 #include <string>
 #include <sstream>
 
