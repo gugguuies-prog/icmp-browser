@@ -5,6 +5,7 @@
  */
 
 #include "icmp_handler.h"
+#include "http_proxy.h"
 #include "../common/protocol.h"
 #include "../common/handshake.h"
 #include "../crypto/aes_gcm.h"
@@ -188,17 +189,27 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     
     LOG_VERBOSE("[Server] Encrypting response with data_seq=%d\n", session->data_sequence_counter);
     
-    // TODO: Forward to TUN device
-    // For now, just echo back an encrypted response
+    // Process HTTP request via proxy
+    uint8_t http_response_packet[4096];
+    size_t http_response_size;
     
-    // Create a dummy response (echo the decrypted data back)
+    if (http_proxy_process(decrypted, decrypted_size, 
+                          http_response_packet, &http_response_size, 
+                          sizeof(http_response_packet)) < 0) {
+        LOG_VERBOSE("[Server] HTTP proxy failed, echoing request\n");
+        // Fallback: echo the request back
+        memcpy(http_response_packet, decrypted, decrypted_size);
+        http_response_size = decrypted_size;
+    }
+    
+    // Encapsulate the response
     proto_packet_t response_packets[10];
     size_t response_count;
     
-    result = proto_encapsulate(decrypted, decrypted_size,
+    result = proto_encapsulate(http_response_packet, http_response_size,
                                session->session_key,
                                session->session_id,
-                               session->data_sequence_counter,  // Use incremented session counter
+                               session->data_sequence_counter,
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
