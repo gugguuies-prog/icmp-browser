@@ -502,6 +502,15 @@ static bool InitializeICMPSession() {
     
     // Copy session key
     memcpy(g_sessionKey, hs_ctx.session_key, sizeof(g_sessionKey));
+    
+    // Debug: log session key
+    char key_str[256];
+    sprintf_s(key_str, sizeof(key_str),
+             "Client session key: %02X %02X %02X %02X %02X %02X %02X %02X",
+             g_sessionKey[0], g_sessionKey[1], g_sessionKey[2], g_sessionKey[3],
+             g_sessionKey[4], g_sessionKey[5], g_sessionKey[6], g_sessionKey[7]);
+    OutputDebugStringA(key_str);
+    
     handshake_cleanup(&hs_ctx);
     g_handshakeComplete = true;
     
@@ -549,6 +558,15 @@ static std::string FetchViaICMP(const std::string& url) {
     size_t packet_count = 0;
     
     uint16_t data_seq = g_dataSequence++;
+    
+    // Debug log
+    char debug[512];
+    sprintf_s(debug, sizeof(debug),
+             "Sending request:\ndata_seq=%d\nsession_id=0x%04x\nkey=%02X %02X %02X %02X...\nrequest_size=%zu",
+             data_seq, g_session->session_id,
+             g_sessionKey[0], g_sessionKey[1], g_sessionKey[2], g_sessionKey[3],
+             http_request.size());
+    OutputDebugStringA(debug);
     
     int result = proto_encapsulate((const uint8_t*)http_request.c_str(), http_request.size(),
                                    g_sessionKey, g_session->session_id,
