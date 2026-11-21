@@ -608,8 +608,9 @@ static std::string FetchViaICMP(const std::string& url) {
         return "<html><body><h1>Error</h1><p>Failed to encapsulate request</p></body></html>";
     }
     
-    // Send all packets and collect responses
+    // Send all packets and collect responses - WITH FRAGMENT HANDLING
     std::string html_response;
+    proto_reassembly_ctx_t reassembly_ctx = {0};  // Fragment reassembly context
     
     for (size_t i = 0; i < packet_count; i++) {
         // Prepare packet for sending
@@ -630,6 +631,7 @@ static std::string FetchViaICMP(const std::string& url) {
             sprintf_s(error, sizeof(error), 
                      "<html><body><h1>Error</h1><p>ICMP send failed: %s</p></body></html>",
                      icmp_error_string(send_result));
+            proto_reset_reassembly(&reassembly_ctx);
             return std::string(error);
         }
         
@@ -645,37 +647,83 @@ static std::string FetchViaICMP(const std::string& url) {
             memcpy(response.payload, reply_buffer + sizeof(proto_header_t), response.payload_size);
         }
         
-        // Decapsulate response
-        uint8_t decrypted[8192];
-        size_t decrypted_size = 0;
-        
-        // Use the same data_seq for decrypting the response
-        int decrypt_result = proto_decapsulate(&response, g_sessionKey, g_session->session_id,
-                                              data_seq, decrypted,
-                                              &decrypted_size, sizeof(decrypted));
-        
-        // Debug log
-        char decrypt_log[256];
-        sprintf_s(decrypt_log, sizeof(decrypt_log),
-                 "Decrypt response: result=%d, size=%zu, first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
-                 decrypt_result, decrypted_size,
-                 decrypted_size > 0 ? decrypted[0] : 0,
-                 decrypted_size > 1 ? decrypted[1] : 0,
-                 decrypted_size > 2 ? decrypted[2] : 0,
-                 decrypted_size > 3 ? decrypted[3] : 0,
-                 decrypted_size > 4 ? decrypted[4] : 0,
-                 decrypted_size > 5 ? decrypted[5] : 0,
-                 decrypted_size > 6 ? decrypted[6] : 0,
-                 decrypted_size > 7 ? decrypted[7] : 0);
-        OutputDebugStringA(decrypt_log);
-        
-        if (decrypt_result == PROTO_SUCCESS && decrypted_size > 0) {
-            html_response.append((char*)decrypted, decrypted_size);
+        // Check if response is fragmented
+        if (response.header.flags & PROTO_FLAG_FRAGMENTED) {
+            // Debug: log fragment info
+            char frag_log[256];
+            sprintf_s(frag_log, sizeof(frag_log),
+                     "Fragment received: frag_id=%d, frag_num=%d, total=%d",
+                     response.header.fragment_id,
+                     response.header.fragment_num,
+                     response.header.total_fragments);
+            OutputDebugStringA(frag_log);
+            
+            // Add fragment to reassembly context
+            int frag_result = proto_add_fragment(&reassembly_ctx, &response, g_sessionKey,
+                                                 g_session->session_id, data_seq);
+            
+            if (frag_result > 0) {
+                // Reassembly complete! Get the full data
+                uint8_t reassembled[65536];
+                size_t reassembled_size = 0;
+                
+                int get_result = proto_get_reassembled(&reassembly_ctx, reassembled,
+                                                       &reassembled_size, sizeof(reassembled));
+                
+                if (get_result == PROTO_SUCCESS && reassembled_size > 0) {
+                    char success_log[256];
+                    sprintf_s(success_log, sizeof(success_log),
+                             "Reassembly complete! Total size: %zu bytes",
+                             reassembled_size);
+                    OutputDebugStringA(success_log);
+                    
+                    html_response.append((char*)reassembled, reassembled_size);
+                } else {
+                    OutputDebugStringA("ERROR: Failed to get reassembled data");
+                }
+                
+                proto_reset_reassembly(&reassembly_ctx);
+                break;  // Done with this response
+            } else if (frag_result == PROTO_ERROR_INCOMPLETE) {
+                // Need more fragments, continue
+                continue;
+            } else {
+                // Error in fragment reassembly
+                char err_log[256];
+                sprintf_s(err_log, sizeof(err_log),
+                         "Fragment reassembly error: %d", frag_result);
+                OutputDebugStringA(err_log);
+                proto_reset_reassembly(&reassembly_ctx);
+                break;
+            }
+        } else {
+            // Non-fragmented response - decrypt directly
+            uint8_t decrypted[8192];
+            size_t decrypted_size = 0;
+            
+            int decrypt_result = proto_decapsulate(&response, g_sessionKey, g_session->session_id,
+                                                  data_seq, decrypted,
+                                                  &decrypted_size, sizeof(decrypted));
+            
+            // Debug log
+            char decrypt_log[256];
+            sprintf_s(decrypt_log, sizeof(decrypt_log),
+                     "Decrypt response: result=%d, size=%zu, first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+                     decrypt_result, decrypted_size,
+                     decrypted_size > 0 ? decrypted[0] : 0,
+                     decrypted_size > 1 ? decrypted[1] : 0,
+                     decrypted_size > 2 ? decrypted[2] : 0,
+                     decrypted_size > 3 ? decrypted[3] : 0,
+                     decrypted_size > 4 ? decrypted[4] : 0,
+                     decrypted_size > 5 ? decrypted[5] : 0,
+                     decrypted_size > 6 ? decrypted[6] : 0,
+                     decrypted_size > 7 ? decrypted[7] : 0);
+            OutputDebugStringA(decrypt_log);
+            
+            if (decrypt_result == PROTO_SUCCESS && decrypted_size > 0) {
+                html_response.append((char*)decrypted, decrypted_size);
+            }
         }
-    }
-    
-    if (html_response.empty()) {
-        return "<html><body><h1>Error</h1><p>No response from server</p></body></html>";
     }
     
     // Extract HTML from HTTP response
