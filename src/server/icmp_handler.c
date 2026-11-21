@@ -232,33 +232,27 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
-        // Concatenate ALL fragments into a single ICMP packet
-        uint8_t combined_payload[8192];
-        size_t combined_size = 0;
-        
+        // Send each fragment in a separate ICMP packet
         for (size_t frag_idx = 0; frag_idx < response_count; frag_idx++) {
             proto_packet_t *resp = &response_packets[frag_idx];
-            size_t frag_total = 8 + resp->payload_size;
             
-            if (combined_size + frag_total > sizeof(combined_payload)) {
-                LOG_VERBOSE("[Server] WARNING: Combined payload too large, truncating\n");
-                break;
-            }
+            // Create buffer for this single fragment (header + payload)
+            uint8_t fragment_buffer[PROTO_MAX_PAYLOAD + 8];
+            size_t fragment_size = 8 + resp->payload_size;
             
-            memcpy(combined_payload + combined_size, &resp->header, 8);
-            memcpy(combined_payload + combined_size + 8, resp->payload, resp->payload_size);
-            combined_size += frag_total;
+            // Copy header and payload
+            memcpy(fragment_buffer, &resp->header, 8);
+            memcpy(fragment_buffer + 8, resp->payload, resp->payload_size);
             
-            LOG_VERBOSE("[Server] Added fragment %zu/%zu (%zu bytes) to combined payload\n", 
-                       frag_idx + 1, response_count, frag_total);
+            // Send THIS fragment as a separate ICMP packet
+            icmp_send_reply(server, client_addr, session->session_id,
+                           icmp_sequence, fragment_buffer, fragment_size);
+            
+            LOG_VERBOSE("[Server] Sent fragment %zu/%zu (%zu bytes)\n",
+                       frag_idx + 1, response_count, fragment_size);
         }
         
-        // Send single ICMP packet with all fragments
-        icmp_send_reply(server, client_addr, session->session_id, 
-                       icmp_sequence, combined_payload, combined_size);
-        
-        LOG_VERBOSE("[Server] Sent ALL %zu fragments in single packet (%zu bytes total)\n", 
-                   response_count, combined_size);
+        LOG_VERBOSE("[Server] Sent %zu fragments in separate packets\n", response_count);
         
         // NOW increment counter for next request/response pair
         session->data_sequence_counter++;
