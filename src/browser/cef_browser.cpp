@@ -775,9 +775,6 @@ static std::string FetchViaICMP(const std::string& url) {
                             sprintf_s(log, sizeof(log), "Chunk %d fetch failed, stopping", chunk_num);
                             OutputDebugStringA(log);
         
-        // DEBUG: Write HTML to file for inspection
-        FILE* f = fopen("C:\\\\icmp-debug.html", "wb");
-        if (f) { fwrite(html.c_str(), 1, html.size(), f); fclose(f); }
                             break;
                         }
                         
@@ -802,9 +799,6 @@ static std::string FetchViaICMP(const std::string& url) {
                             sprintf_s(log, sizeof(log), "Received chunk %d: %zu bytes", chunk_num, chunk_decrypted_size);
                             OutputDebugStringA(log);
         
-        // DEBUG: Write HTML to file for inspection
-        FILE* f = fopen("C:\\\\icmp-debug.html", "wb");
-        if (f) { fwrite(html.c_str(), 1, html.size(), f); fclose(f); }
                             
                             // If chunk is less than 1200 bytes, it's the last one
                             if (chunk_decrypted_size < 1200) {
