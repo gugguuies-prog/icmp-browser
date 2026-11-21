@@ -200,6 +200,10 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     
     LOG_VERBOSE("[Server] Decrypted %zu bytes\n", decrypted_size);
     
+    // Debug: show decrypted content
+    LOG_VERBOSE("[Server] Decrypted content (first 200 chars): %.*s\n", 
+                (int)(decrypted_size < 200 ? decrypted_size : 200), decrypted);
+    
     // DON'T increment here - use same data_seq for response
     
     LOG_VERBOSE("[Server] Encrypting response with data_seq=%d\n", data_seq);
