@@ -106,6 +106,15 @@ int icmp_send_packet(icmp_session_t *session, const uint8_t *payload, size_t pay
         ICMP_REPLY_BUFFER_SIZE,
         session->timeout_ms
     );
+    
+    // Debug: log what we sent
+    char debug_send[256];
+    sprintf_s(debug_send, sizeof(debug_send),
+             "ICMP Send: payload_size=%zu, first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+             payload_size,
+             payload[0], payload[1], payload[2], payload[3],
+             payload[4], payload[5], payload[6], payload[7]);
+    OutputDebugStringA(debug_send);
 
     int result = ICMP_SUCCESS;
     if (dwRetVal == 0) {
@@ -149,6 +158,14 @@ int icmp_wait_reply(icmp_session_t *session, uint8_t *reply_payload,
 
     // Parse the reply buffer from last send
     PICMP_ECHO_REPLY pEchoReply = (PICMP_ECHO_REPLY)session->reply_buffer;
+    
+    // Debug: log reply details
+    char debug[512];
+    sprintf_s(debug, sizeof(debug),
+             "ICMP Reply: Status=%lu, RTT=%lu ms, DataSize=%d, Address=%08X",
+             pEchoReply->Status, pEchoReply->RoundTripTime, 
+             pEchoReply->DataSize, pEchoReply->Address);
+    OutputDebugStringA(debug);
     
     if (pEchoReply->Status == IP_SUCCESS && pEchoReply->DataSize > 0) {
         // Copy payload
