@@ -490,7 +490,11 @@ int http_proxy_process(const uint8_t *ip_packet, size_t packet_size,
     }
     
     // Return raw HTTP response (not IP packet)
-    if (http_response_size > max_response) {
+    // Limit response to 1200 bytes to fit in single ICMP packet (Windows limitation)
+    if (http_response_size > 1200) {
+        printf("[HTTP Proxy] Truncating response from %zu to 1200 bytes\n", http_response_size);
+        http_response_size = 1200;
+    } else if (http_response_size > max_response) {
         http_response_size = max_response;
     }
     memcpy(response_packet, http_response, http_response_size);
