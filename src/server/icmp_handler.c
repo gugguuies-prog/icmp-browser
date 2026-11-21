@@ -298,7 +298,8 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
                    response_count, combined_size);
         
         // Only increment counter if this is the last chunk or non-cached response
-        uint8_t is_last_chunk = (requested_chunk > 0) ? (http_response_size < 1200) : 1;
+        // Check if this is the last chunk: response size < 1200 OR no cache (complete in one go)
+        uint8_t is_last_chunk = (http_response_size < 1200) || (session->cached_response_size <= 1200);
         if (is_last_chunk) {
             session->data_sequence_counter++;
             LOG_VERBOSE("[Server] Incremented data_seq to %d (last chunk sent)\n", session->data_sequence_counter);
