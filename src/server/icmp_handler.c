@@ -232,17 +232,27 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
-        // Send first fragment (simplified - should send all fragments)
-        proto_packet_t *resp = &response_packets[0];
-        uint8_t reply_payload[ICMP_MTU];
-        memcpy(reply_payload, &resp->header, 8);
-        memcpy(reply_payload + 8, resp->payload, resp->payload_size);
-        size_t total_size = 8 + resp->payload_size;
+        // Send ALL fragments
+        for (size_t frag_idx = 0; frag_idx < response_count; frag_idx++) {
+            proto_packet_t *resp = &response_packets[frag_idx];
+            uint8_t reply_payload[ICMP_MTU];
+            memcpy(reply_payload, &resp->header, 8);
+            memcpy(reply_payload + 8, resp->payload, resp->payload_size);
+            size_t total_size = 8 + resp->payload_size;
+            
+            icmp_send_reply(server, client_addr, session->session_id, 
+                           icmp_sequence + frag_idx, reply_payload, total_size);
+            
+            LOG_VERBOSE("[Server] Sent fragment %zu/%zu (%zu bytes)\n", 
+                       frag_idx + 1, response_count, total_size);
+            
+            // Small delay between fragments to avoid packet loss
+            if (frag_idx < response_count - 1) {
+                usleep(10000); // 10ms delay
+            }
+        }
         
-        icmp_send_reply(server, client_addr, session->session_id, 
-                       icmp_sequence, reply_payload, total_size);
-        
-        LOG_VERBOSE("[Server] Sent encrypted response (%zu bytes)\n", total_size);
+        LOG_VERBOSE("[Server] Sent all %zu fragments\n", response_count);
         
         // NOW increment counter for next request/response pair
         session->data_sequence_counter++;
