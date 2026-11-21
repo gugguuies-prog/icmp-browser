@@ -486,6 +486,15 @@ static bool InitializeICMPSession() {
     
     // Copy session key
     memcpy(g_sessionKey, hs_ctx.session_key, sizeof(g_sessionKey));
+    
+    // Debug: show session key (first 8 bytes)
+    char key_debug[256];
+    sprintf_s(key_debug, sizeof(key_debug),
+             "Handshake complete!\nSession key (first 8 bytes): %02X %02X %02X %02X %02X %02X %02X %02X",
+             g_sessionKey[0], g_sessionKey[1], g_sessionKey[2], g_sessionKey[3],
+             g_sessionKey[4], g_sessionKey[5], g_sessionKey[6], g_sessionKey[7]);
+    MessageBoxA(g_hwnd, key_debug, "Debug", MB_OK | MB_ICONINFORMATION);
+    
     handshake_cleanup(&hs_ctx);
     g_handshakeComplete = true;
     

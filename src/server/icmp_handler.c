@@ -184,10 +184,9 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     
     LOG_VERBOSE("[Server] Decrypted %zu bytes\n", decrypted_size);
     
-    // Increment session counter for next packet
-    session->data_sequence_counter++;
+    // DON'T increment here - use same data_seq for response
     
-    LOG_VERBOSE("[Server] Encrypting response with data_seq=%d\n", session->data_sequence_counter);
+    LOG_VERBOSE("[Server] Encrypting response with data_seq=%d\n", data_seq);
     
     // Process HTTP request via proxy
     uint8_t http_response_packet[4096];
@@ -209,7 +208,7 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     result = proto_encapsulate(http_response_packet, http_response_size,
                                session->session_key,
                                session->session_id,
-                               session->data_sequence_counter,
+                               data_seq,  // Use same data_seq as request
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
@@ -225,7 +224,7 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
         
         LOG_VERBOSE("[Server] Sent encrypted response (%zu bytes)\n", total_size);
         
-        // Increment counter again after sending response
+        // NOW increment counter for next request/response pair
         session->data_sequence_counter++;
     }
     
