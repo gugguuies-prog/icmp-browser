@@ -151,7 +151,8 @@ static int perform_http_request(const char *host, int port, const char *http_req
     size_t total_received = 0;
     ssize_t n;
     
-    while (total_received < max_size - 1) {
+    // Limit to 1200 bytes to fit in single ICMP packet (Windows limitation)
+    while (total_received < max_size - 1 && total_received < 1200) {
         n = recv(sock, response + total_received, max_size - total_received - 1, 0);
         if (n <= 0) break;
         total_received += n;
@@ -250,7 +251,8 @@ static int perform_https_request(const char *host, int port, const char *http_re
     size_t total_received = 0;
     int n;
     
-    while (total_received < max_size - 1) {
+    // Limit to 1200 bytes to fit in single ICMP packet (Windows limitation)
+    while (total_received < max_size - 1 && total_received < 1200) {
         n = SSL_read(ssl, response + total_received, max_size - total_received - 1);
         if (n <= 0) break;
         total_received += n;
