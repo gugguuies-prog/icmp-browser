@@ -132,6 +132,14 @@ int handshake_server_process(handshake_context_t *ctx,
         return HANDSHAKE_ERROR_DH_KEYGEN;
     }
     
+    // Debug: log what was generated
+    printf("[DEBUG] Server generated pubkey (first 8): %02X %02X %02X %02X %02X %02X %02X %02X\n",
+           ctx->server_public_key[0], ctx->server_public_key[1], ctx->server_public_key[2], ctx->server_public_key[3],
+           ctx->server_public_key[4], ctx->server_public_key[5], ctx->server_public_key[6], ctx->server_public_key[7]);
+    printf("[DEBUG] Client pubkey (first 8): %02X %02X %02X %02X %02X %02X %02X %02X\n",
+           ctx->client_public_key[0], ctx->client_public_key[1], ctx->client_public_key[2], ctx->client_public_key[3],
+           ctx->client_public_key[4], ctx->client_public_key[5], ctx->client_public_key[6], ctx->client_public_key[7]);
+    
     // Compute shared secret and derive session key
     uint8_t shared_secret[256];
     size_t secret_len;
