@@ -394,8 +394,17 @@ void OnNavigate() {
         sprintf_s(log, sizeof(log), "Displaying HTML (%zu bytes, first 100 chars): %.100s", html.size(), html.c_str());
         OutputDebugStringA(log);
         
-        // Use LoadString instead of LoadURL for proper HTML rendering
-        g_browser->GetMainFrame()->LoadString(html, "http://icmp-browser/");
+        // URL-encode the HTML for data URL
+        std::string encoded_html;
+        for (char c : html) {
+            if (c == '%') encoded_html += "%25";
+            else if (c == '#') encoded_html += "%23";
+            else if (c == '&') encoded_html += "%26";
+            else if (c == '+') encoded_html += "%2B";
+            else encoded_html += c;
+        }
+        std::string dataUrl = "data:text/html;charset=utf-8," + encoded_html;
+        g_browser->GetMainFrame()->LoadURL(dataUrl);
     }
 }
 
