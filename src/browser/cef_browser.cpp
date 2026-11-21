@@ -133,10 +133,13 @@ public:
     virtual void OnLoadStart(CefRefPtr<CefBrowser> browser,
                             CefRefPtr<CefFrame> frame,
                             TransitionType transition_type) override {
-        // Update URL bar
+        // Update URL bar only for real URLs (not data: URLs from our fetch)
         if (frame->IsMain()) {
             std::string url = frame->GetURL();
-            SetWindowTextA(g_urlBar, url.c_str());
+            // Don't update URL bar for data: URLs (our fetched content)
+            if (url.find("data:") != 0) {
+                SetWindowTextA(g_urlBar, url.c_str());
+            }
         }
     }
 
@@ -424,8 +427,12 @@ void OnSettings() {
 
 // Helper functions for ICMP communication
 static bool InitializeICMPSession() {
+    // Destroy old session if exists
     if (g_session != NULL) {
-        return true; // Already initialized
+        icmp_session_destroy(g_session);
+        g_session = NULL;
+        g_handshakeComplete = false;
+        g_dataSequence = 0;
     }
     
     // Create ICMP session
