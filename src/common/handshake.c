@@ -166,6 +166,11 @@ int handshake_server_process(handshake_context_t *ctx,
         return HANDSHAKE_ERROR_PROTOCOL;
     }
     
+    // Debug: verify what's in the response packet
+    printf("[DEBUG] Response packet payload (first 8): %02X %02X %02X %02X %02X %02X %02X %02X\n",
+           response_packet->payload[0], response_packet->payload[1], response_packet->payload[2], response_packet->payload[3],
+           response_packet->payload[4], response_packet->payload[5], response_packet->payload[6], response_packet->payload[7]);
+    
     ctx->state = HANDSHAKE_STATE_COMPLETED;
     
     return HANDSHAKE_SUCCESS;

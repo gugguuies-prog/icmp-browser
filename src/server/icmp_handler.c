@@ -152,6 +152,13 @@ static int handle_handshake(icmp_server_t *server, icmp_session_info_t *session,
     memcpy(reply_payload + 8, response.payload, response.payload_size);
     size_t total_size = 8 + response.payload_size;
     
+    // Debug: verify what we're about to send
+    LOG_VERBOSE("[Server] Sending reply_payload (first 16 bytes): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                reply_payload[0], reply_payload[1], reply_payload[2], reply_payload[3],
+                reply_payload[4], reply_payload[5], reply_payload[6], reply_payload[7],
+                reply_payload[8], reply_payload[9], reply_payload[10], reply_payload[11],
+                reply_payload[12], reply_payload[13], reply_payload[14], reply_payload[15]);
+    
     icmp_send_reply(server, client_addr, session->session_id, icmp_sequence, reply_payload, total_size);
     
     handshake_cleanup(&hs_ctx);
