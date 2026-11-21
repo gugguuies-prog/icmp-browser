@@ -232,30 +232,37 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
                                response_packets, &response_count, 10);
     
     if (result == PROTO_SUCCESS && response_count > 0) {
-        // Send ALL fragments
+        // Concatenate ALL fragments into a single ICMP packet
+        uint8_t combined_payload[8192];
+        size_t combined_size = 0;
+        
         for (size_t frag_idx = 0; frag_idx < response_count; frag_idx++) {
             proto_packet_t *resp = &response_packets[frag_idx];
-            uint8_t reply_payload[ICMP_MTU];
-            memcpy(reply_payload, &resp->header, 8);
-            memcpy(reply_payload + 8, resp->payload, resp->payload_size);
-            size_t total_size = 8 + resp->payload_size;
+            size_t frag_total = 8 + resp->payload_size;
             
-            icmp_send_reply(server, client_addr, session->session_id, 
-                           icmp_sequence + frag_idx, reply_payload, total_size);
-            
-            LOG_VERBOSE("[Server] Sent fragment %zu/%zu (%zu bytes)\n", 
-                       frag_idx + 1, response_count, total_size);
-            
-            // Small delay between fragments to avoid packet loss
-            if (frag_idx < response_count - 1) {
-                usleep(10000); // 10ms delay
+            if (combined_size + frag_total > sizeof(combined_payload)) {
+                LOG_VERBOSE("[Server] WARNING: Combined payload too large, truncating\n");
+                break;
             }
+            
+            memcpy(combined_payload + combined_size, &resp->header, 8);
+            memcpy(combined_payload + combined_size + 8, resp->payload, resp->payload_size);
+            combined_size += frag_total;
+            
+            LOG_VERBOSE("[Server] Added fragment %zu/%zu (%zu bytes) to combined payload\n", 
+                       frag_idx + 1, response_count, frag_total);
         }
         
-        LOG_VERBOSE("[Server] Sent all %zu fragments\n", response_count);
+        // Send single ICMP packet with all fragments
+        icmp_send_reply(server, client_addr, session->session_id, 
+                       icmp_sequence, combined_payload, combined_size);
+        
+        LOG_VERBOSE("[Server] Sent ALL %zu fragments in single packet (%zu bytes total)\n", 
+                   response_count, combined_size);
         
         // NOW increment counter for next request/response pair
         session->data_sequence_counter++;
+    }
     }
     
     return 0;

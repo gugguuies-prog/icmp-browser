@@ -639,148 +639,93 @@ static std::string FetchViaICMP(const std::string& url) {
             continue; // Skip invalid responses
         }
         
-        // Parse response packet
-        proto_packet_t response;
-        memcpy(&response.header, reply_buffer, sizeof(proto_header_t));
-        response.payload_size = reply_size - sizeof(proto_header_t);
-        if (response.payload_size > 0 && response.payload_size <= PROTO_MAX_PAYLOAD) {
-            memcpy(response.payload, reply_buffer + sizeof(proto_header_t), response.payload_size);
-        }
+        // Parse ALL fragments from the response packet (server concatenates them)
+        size_t offset = 0;
         
-        // Check if response is fragmented
-        if (response.header.flags & PROTO_FLAG_FRAGMENTED) {
-            // Debug: log fragment info
+        OutputDebugStringA("Parsing fragments from combined packet...");
+        
+        while (offset + sizeof(proto_header_t) <= reply_size) {
+            // Parse fragment header
+            proto_packet_t frag;
+            memcpy(&frag.header, reply_buffer + offset, sizeof(proto_header_t));
+            offset += sizeof(proto_header_t);
+            
+            // Calculate payload size for this fragment
+            // Each fragment has its own header+payload in the buffer
+            size_t frag_payload_size = frag.header.fragment_num < (frag.header.total_fragments - 1) ? 
+                                       PROTO_MAX_PAYLOAD : (reply_size - offset);
+            
+            if (frag_payload_size > PROTO_MAX_PAYLOAD) frag_payload_size = PROTO_MAX_PAYLOAD;
+            
+            frag.payload_size = frag_payload_size;
+            
+            if (frag.payload_size > 0 && offset + frag.payload_size <= reply_size) {
+                memcpy(frag.payload, reply_buffer + offset, frag.payload_size);
+                offset += frag.payload_size;
+            } else {
+                break; // No more complete fragments
+            }
+            
+            // Log fragment
             char frag_log[256];
             sprintf_s(frag_log, sizeof(frag_log),
-                     "Fragment received: frag_id=%d, frag_num=%d, total=%d",
-                     response.header.fragment_id,
-                     response.header.fragment_num,
-                     response.header.total_fragments);
+                     "Parsed fragment: frag_id=%d, frag_num=%d, total=%d, size=%zu",
+                     frag.header.fragment_id, frag.header.fragment_num,
+                     frag.header.total_fragments, frag.payload_size);
             OutputDebugStringA(frag_log);
             
-            // Add fragment to reassembly context
-            int frag_result = proto_add_fragment(&reassembly_ctx, &response, g_sessionKey,
-                                                 g_session->session_id, data_seq);
-            
-            if (frag_result > 0) {
-                // Reassembly complete! Get the full data
-                uint8_t reassembled[65536];
-                size_t reassembled_size = 0;
+            // Check if fragmented
+            if (frag.header.flags & PROTO_FLAG_FRAGMENTED) {
+                // Add to reassembly
+                int frag_result = proto_add_fragment(&reassembly_ctx, &frag, g_sessionKey,
+                                                     g_session->session_id, data_seq);
                 
-                int get_result = proto_get_reassembled(&reassembly_ctx, reassembled,
-                                                       &reassembled_size, sizeof(reassembled));
-                
-                if (get_result == PROTO_SUCCESS && reassembled_size > 0) {
-                    char success_log[256];
-                    sprintf_s(success_log, sizeof(success_log),
-                             "Reassembly complete! Total size: %zu bytes",
-                             reassembled_size);
-                    OutputDebugStringA(success_log);
+                if (frag_result > 0) {
+                    // Reassembly complete!
+                    uint8_t reassembled[65536];
+                    size_t reassembled_size = 0;
                     
-                    html_response.append((char*)reassembled, reassembled_size);
-                } else {
-                    OutputDebugStringA("ERROR: Failed to get reassembled data");
-                }
-                
-                proto_reset_reassembly(&reassembly_ctx);
-                break;  // Done with this response
-            } else if (frag_result == PROTO_ERROR_INCOMPLETE) {
-                // Need more fragments - actively receive them
-                OutputDebugStringA("Fragment incomplete, receiving remaining fragments...");
-                
-                uint16_t expected_total = response.header.total_fragments;
-                
-                // Receive remaining fragments
-                for (uint16_t frag_idx = 1; frag_idx < expected_total && frag_idx < 10; frag_idx++) {
-                    // Create a dummy send to trigger receive (Windows ICMP API limitation)
-                    uint8_t dummy[8] = {0};
-                    uint8_t next_reply[8192];
-                    size_t next_size = 0;
+                    int get_result = proto_get_reassembled(&reassembly_ctx, reassembled,
+                                                           &reassembled_size, sizeof(reassembled));
                     
-                    // Send minimal packet to receive next fragment
-                    int recv_result = icmp_send_reliable(g_session, dummy, 1, next_reply, &next_size);
-                    
-                    if (recv_result == ICMP_SUCCESS && next_size >= sizeof(proto_header_t)) {
-                        // Parse next fragment
-                        proto_packet_t next_frag;
-                        memcpy(&next_frag.header, next_reply, sizeof(proto_header_t));
-                        next_frag.payload_size = next_size - sizeof(proto_header_t);
-                        if (next_frag.payload_size > 0 && next_frag.payload_size <= PROTO_MAX_PAYLOAD) {
-                            memcpy(next_frag.payload, next_reply + sizeof(proto_header_t), next_frag.payload_size);
-                        }
+                    if (get_result == PROTO_SUCCESS && reassembled_size > 0) {
+                        char success_log[256];
+                        sprintf_s(success_log, sizeof(success_log),
+                                 "Reassembly complete! Total size: %zu bytes",
+                                 reassembled_size);
+                        OutputDebugStringA(success_log);
                         
-                        char frag_log2[256];
-                        sprintf_s(frag_log2, sizeof(frag_log2),
-                                 "Received additional fragment: frag_num=%d",
-                                 next_frag.header.fragment_num);
-                        OutputDebugStringA(frag_log2);
-                        
-                        // Add this fragment
-                        int next_result = proto_add_fragment(&reassembly_ctx, &next_frag, g_sessionKey,
-                                                           g_session->session_id, data_seq);
-                        
-                        if (next_result > 0) {
-                            // Complete!
-                            uint8_t reassembled[65536];
-                            size_t reassembled_size = 0;
-                            
-                            int get_result = proto_get_reassembled(&reassembly_ctx, reassembled,
-                                                                   &reassembled_size, sizeof(reassembled));
-                            
-                            if (get_result == PROTO_SUCCESS && reassembled_size > 0) {
-                                char success_log[256];
-                                sprintf_s(success_log, sizeof(success_log),
-                                         "Reassembly complete! Total size: %zu bytes",
-                                         reassembled_size);
-                                OutputDebugStringA(success_log);
-                                
-                                html_response.append((char*)reassembled, reassembled_size);
-                            }
-                            
-                            proto_reset_reassembly(&reassembly_ctx);
-                            break;
-                        }
+                        html_response.append((char*)reassembled, reassembled_size);
                     }
+                    
+                    proto_reset_reassembly(&reassembly_ctx);
+                    break; // Done
+                } else if (frag_result == PROTO_ERROR_INCOMPLETE) {
+                    // Continue to next fragment in buffer
+                    continue;
+                } else {
+                    char err_log[256];
+                    sprintf_s(err_log, sizeof(err_log), "Fragment error: %d", frag_result);
+                    OutputDebugStringA(err_log);
+                    break;
                 }
-                continue;
             } else {
-                // Error in fragment reassembly
-                char err_log[256];
-                sprintf_s(err_log, sizeof(err_log),
-                         "Fragment reassembly error: %d", frag_result);
-                OutputDebugStringA(err_log);
-                proto_reset_reassembly(&reassembly_ctx);
+                // Non-fragmented response
+                uint8_t decrypted[8192];
+                size_t decrypted_size = 0;
+                
+                int decrypt_result = proto_decapsulate(&frag, g_sessionKey, g_session->session_id,
+                                                      data_seq, decrypted,
+                                                      &decrypted_size, sizeof(decrypted));
+                
+                if (decrypt_result == PROTO_SUCCESS && decrypted_size > 0) {
+                    html_response.append((char*)decrypted, decrypted_size);
+                }
                 break;
-            }
-        } else {
-            // Non-fragmented response - decrypt directly
-            uint8_t decrypted[8192];
-            size_t decrypted_size = 0;
-            
-            int decrypt_result = proto_decapsulate(&response, g_sessionKey, g_session->session_id,
-                                                  data_seq, decrypted,
-                                                  &decrypted_size, sizeof(decrypted));
-            
-            // Debug log
-            char decrypt_log[256];
-            sprintf_s(decrypt_log, sizeof(decrypt_log),
-                     "Decrypt response: result=%d, size=%zu, first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
-                     decrypt_result, decrypted_size,
-                     decrypted_size > 0 ? decrypted[0] : 0,
-                     decrypted_size > 1 ? decrypted[1] : 0,
-                     decrypted_size > 2 ? decrypted[2] : 0,
-                     decrypted_size > 3 ? decrypted[3] : 0,
-                     decrypted_size > 4 ? decrypted[4] : 0,
-                     decrypted_size > 5 ? decrypted[5] : 0,
-                     decrypted_size > 6 ? decrypted[6] : 0,
-                     decrypted_size > 7 ? decrypted[7] : 0);
-            OutputDebugStringA(decrypt_log);
-            
-            if (decrypt_result == PROTO_SUCCESS && decrypted_size > 0) {
-                html_response.append((char*)decrypted, decrypted_size);
             }
         }
     }
+    
     
     // Extract HTML from HTTP response
     size_t body_start = html_response.find("\r\n\r\n");
