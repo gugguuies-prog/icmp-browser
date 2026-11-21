@@ -105,6 +105,22 @@ public:
     // CefLifeSpanHandler methods
     virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
         g_browser = browser;
+        
+        // Load welcome page
+        std::string welcome_html = 
+            "<html><head><style>"
+            "body { background: #121212; color: #fff; font-family: 'Segoe UI', sans-serif; "
+            "       display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }"
+            "h1 { font-size: 48px; font-weight: 300; }"
+            "p { font-size: 18px; color: #aaa; }"
+            "</style></head><body>"
+            "<div style='text-align: center;'>"
+            "<h1>ICMP Browser</h1>"
+            "<p>Enter a URL in the address bar to start browsing</p>"
+            "<p style='font-size: 14px; margin-top: 40px;'>Connected to: " + g_serverIp + "</p>"
+            "</div></body></html>";
+        
+        browser->GetMainFrame()->LoadURL("data:text/html;charset=utf-8," + welcome_html);
     }
 
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {
@@ -486,15 +502,6 @@ static bool InitializeICMPSession() {
     
     // Copy session key
     memcpy(g_sessionKey, hs_ctx.session_key, sizeof(g_sessionKey));
-    
-    // Debug: show session key (first 8 bytes)
-    char key_debug[256];
-    sprintf_s(key_debug, sizeof(key_debug),
-             "Handshake complete!\nSession key (first 8 bytes): %02X %02X %02X %02X %02X %02X %02X %02X",
-             g_sessionKey[0], g_sessionKey[1], g_sessionKey[2], g_sessionKey[3],
-             g_sessionKey[4], g_sessionKey[5], g_sessionKey[6], g_sessionKey[7]);
-    MessageBoxA(g_hwnd, key_debug, "Debug", MB_OK | MB_ICONINFORMATION);
-    
     handshake_cleanup(&hs_ctx);
     g_handshakeComplete = true;
     
