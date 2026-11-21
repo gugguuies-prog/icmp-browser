@@ -721,8 +721,6 @@ static std::string FetchViaICMP(const std::string& url) {
                 if (decrypt_result == PROTO_SUCCESS && decrypted_size > 0) {
                     html_response.append((char*)decrypted, decrypted_size);
                 }
-                break;
-                
                 // STREAMING: Check if there are more chunks to fetch
                 if (decrypted_size >= 1200) {
                     OutputDebugStringA("First chunk received, fetching remaining chunks...");
@@ -793,7 +791,8 @@ static std::string FetchViaICMP(const std::string& url) {
                             break;
                         }
                     }
-                }
+                
+                break; // Exit after streaming complete}
             }
         }
     }
