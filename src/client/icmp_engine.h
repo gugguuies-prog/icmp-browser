@@ -34,7 +34,7 @@ extern "C" {
 #define ICMP_MTU 1472                    // Maximum payload size (1500 - 20 IP - 8 ICMP)
 #define ICMP_TIMEOUT_MS 5000             // Default timeout (5 seconds)
 #define ICMP_MAX_RETRIES 3               // Maximum retransmission attempts
-#define ICMP_REPLY_BUFFER_SIZE 2048      // Buffer for reply packets
+#define ICMP_REPLY_BUFFER_SIZE 8192      // Buffer for reply packets
 
 // Error codes
 #define ICMP_SUCCESS 0
