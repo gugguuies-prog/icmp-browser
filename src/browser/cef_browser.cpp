@@ -41,13 +41,13 @@ extern "C" {
 #define ID_REFRESH_BTN  1005
 #define ID_SETTINGS_BTN 1006
 
-// Modern colors
-#define COLOR_BG        RGB(18, 18, 18)      // Dark background
-#define COLOR_TOOLBAR   RGB(32, 32, 32)      // Dark toolbar
-#define COLOR_BUTTON    RGB(45, 45, 45)      // Button background
+// Modern colors - Light theme
+#define COLOR_BG        RGB(255, 255, 255)   // White background
+#define COLOR_TOOLBAR   RGB(245, 245, 245)   // Light gray toolbar
+#define COLOR_BUTTON    RGB(240, 240, 240)   // Light button background
 #define COLOR_ACCENT    RGB(0, 120, 212)     // Accent blue
-#define COLOR_TEXT      RGB(255, 255, 255)   // White text
-#define COLOR_BORDER    RGB(60, 60, 60)      // Border
+#define COLOR_TEXT      RGB(0, 0, 0)         // Black text
+#define COLOR_BORDER    RGB(200, 200, 200)   // Light border
 
 // Global state
 static HWND g_hwnd = NULL;
@@ -109,15 +109,15 @@ public:
         // Load welcome page
         std::string welcome_html = 
             "<html><head><style>"
-            "body { background: #121212; color: #fff; font-family: 'Segoe UI', sans-serif; "
+            "body { background: #fff; color: #000; font-family: 'Segoe UI', sans-serif; "
             "       display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }"
             "h1 { font-size: 48px; font-weight: 300; }"
-            "p { font-size: 18px; color: #aaa; }"
+            "p { font-size: 18px; color: #666; }"
             "</style></head><body>"
             "<div style='text-align: center;'>"
             "<h1>ICMP Browser</h1>"
             "<p>Enter a URL in the address bar to start browsing</p>"
-            "<p style='font-size: 14px; margin-top: 40px;'>Connected to: " + g_serverIp + "</p>"
+            "<p style='font-size: 14px; margin-top: 40px; color: #999;'>Connected to: " + g_serverIp + "</p>"
             "</div></body></html>";
         
         browser->GetMainFrame()->LoadURL("data:text/html;charset=utf-8," + welcome_html);
@@ -271,27 +271,27 @@ void CreateModernUI(HWND hwnd) {
     int x = margin;
 
     // Back button
-    g_backBtn = CreateWindowW(L"BUTTON", L"◄",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT,
+    g_backBtn = CreateWindowW(L"BUTTON", L"<",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         x, y, btnSize, btnSize,
         hwnd, (HMENU)ID_BACK_BUTTON, NULL, NULL);
-    SendMessage(g_backBtn, WM_SETFONT, (WPARAM)g_fontIcon, TRUE);
+    SendMessage(g_backBtn, WM_SETFONT, (WPARAM)g_fontNormal, TRUE);
     x += btnSize + 6;
 
     // Forward button
-    g_fwdBtn = CreateWindowW(L"BUTTON", L"►",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT,
+    g_fwdBtn = CreateWindowW(L"BUTTON", L">",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         x, y, btnSize, btnSize,
         hwnd, (HMENU)ID_FWD_BUTTON, NULL, NULL);
-    SendMessage(g_fwdBtn, WM_SETFONT, (WPARAM)g_fontIcon, TRUE);
+    SendMessage(g_fwdBtn, WM_SETFONT, (WPARAM)g_fontNormal, TRUE);
     x += btnSize + 6;
 
     // Refresh button
-    g_refreshBtn = CreateWindowW(L"BUTTON", L"↻",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT,
+    g_refreshBtn = CreateWindowW(L"BUTTON", L"R",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         x, y, btnSize, btnSize,
         hwnd, (HMENU)ID_REFRESH_BTN, NULL, NULL);
-    SendMessage(g_refreshBtn, WM_SETFONT, (WPARAM)g_fontIcon, TRUE);
+    SendMessage(g_refreshBtn, WM_SETFONT, (WPARAM)g_fontNormal, TRUE);
     x += btnSize + margin * 2;
 
     RECT rcClient;
@@ -316,11 +316,11 @@ void CreateModernUI(HWND hwnd) {
     x += 100 + margin;
 
     // Settings button
-    g_settingsBtn = CreateWindowW(L"BUTTON", L"⚙",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT,
+    g_settingsBtn = CreateWindowW(L"BUTTON", L"...",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         x, y, btnSize, btnSize,
         hwnd, (HMENU)ID_SETTINGS_BTN, NULL, NULL);
-    SendMessage(g_settingsBtn, WM_SETFONT, (WPARAM)g_fontIcon, TRUE);
+    SendMessage(g_settingsBtn, WM_SETFONT, (WPARAM)g_fontNormal, TRUE);
 
     // Create CEF browser
     CefWindowInfo window_info;
@@ -330,7 +330,7 @@ void CreateModernUI(HWND hwnd) {
     window_info.style = WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 
     CefBrowserSettings browser_settings;
-    browser_settings.background_color = CefColorSetARGB(255, 18, 18, 18);
+    browser_settings.background_color = CefColorSetARGB(255, 255, 255, 255); // White background
 
     CefRefPtr<BrowserClient> client = new BrowserClient();
 
@@ -653,6 +653,21 @@ static std::string FetchViaICMP(const std::string& url) {
         int decrypt_result = proto_decapsulate(&response, g_sessionKey, g_session->session_id,
                                               data_seq, decrypted,
                                               &decrypted_size, sizeof(decrypted));
+        
+        // Debug log
+        char decrypt_log[256];
+        sprintf_s(decrypt_log, sizeof(decrypt_log),
+                 "Decrypt response: result=%d, size=%zu, first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+                 decrypt_result, decrypted_size,
+                 decrypted_size > 0 ? decrypted[0] : 0,
+                 decrypted_size > 1 ? decrypted[1] : 0,
+                 decrypted_size > 2 ? decrypted[2] : 0,
+                 decrypted_size > 3 ? decrypted[3] : 0,
+                 decrypted_size > 4 ? decrypted[4] : 0,
+                 decrypted_size > 5 ? decrypted[5] : 0,
+                 decrypted_size > 6 ? decrypted[6] : 0,
+                 decrypted_size > 7 ? decrypted[7] : 0);
+        OutputDebugStringA(decrypt_log);
         
         if (decrypt_result == PROTO_SUCCESS && decrypted_size > 0) {
             html_response.append((char*)decrypted, decrypted_size);
