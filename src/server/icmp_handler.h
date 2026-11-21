@@ -23,6 +23,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include "../common/thread_compat.h"
+#include "multi_cache.h"
 
 // Constants
 #define ICMP_MTU 1472                    // Maximum payload size (1500 - 20 IP - 8 ICMP)
@@ -79,11 +80,15 @@ typedef struct {
     uint32_t packets_sent;               // Total packets sent
     uint32_t bytes_received;             // Total bytes received
     uint32_t bytes_sent;                 // Total bytes sent    
-    // Response caching for multi-fragment streaming
+    
+    // Legacy response caching for DATA packets (multi-fragment streaming)
     uint8_t cached_response[65536];      // Cached HTTP response
     size_t cached_response_size;         // Size of cached response
     uint16_t cached_data_seq;            // data_seq for this cached response
     uint8_t cache_valid;                 // Cache valid flag
+    
+    // Multi-response cache for resource interception (RESOURCE_REQUEST packets)
+    multi_response_cache_t* response_cache;  // Per-session response cache
     
 } icmp_session_info_t;
 

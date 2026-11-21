@@ -433,6 +433,10 @@ const char* proto_type_string(uint8_t type) {
             return "KEEPALIVE";
         case PROTO_TYPE_RESET:
             return "RESET";
+        case PROTO_TYPE_RESOURCE_REQUEST:
+            return "RESOURCE_REQUEST";
+        case PROTO_TYPE_RESOURCE_RESPONSE:
+            return "RESOURCE_RESPONSE";
         default:
             return "UNKNOWN";
     }

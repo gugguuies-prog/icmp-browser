@@ -46,6 +46,8 @@ extern "C" {
 #define PROTO_TYPE_ACK 0x03              // Acknowledgment
 #define PROTO_TYPE_KEEPALIVE 0x04        // Keep connection alive
 #define PROTO_TYPE_RESET 0x05            // Reset connection
+#define PROTO_TYPE_RESOURCE_REQUEST 0x06 // Resource request (HTTP URL)
+#define PROTO_TYPE_RESOURCE_RESPONSE 0x07 // Resource response (HTTP data)
 
 // Packet flags
 #define PROTO_FLAG_ENCRYPTED 0x01        // Payload is encrypted
@@ -93,6 +95,48 @@ typedef struct {
     uint8_t payload[PROTO_MAX_PAYLOAD];  // Encrypted payload
     size_t payload_size;                 // Size of payload
 } proto_packet_t;
+
+/**
+ * Resource request payload structure (PROTO_TYPE_RESOURCE_REQUEST)
+ * Payload format (before encryption):
+ * [2 bytes: request_id] [2 bytes: url_length] [N bytes: url]
+ */
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
+typedef struct {
+    uint16_t request_id;                 // Unique request identifier (network byte order)
+    uint16_t url_length;                 // Length of URL string (network byte order)
+    char url[1000];                      // URL string (variable length, max 1000)
+}
+#ifndef _MSC_VER
+__attribute__((packed))
+#endif
+resource_request_payload_t;
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
+
+/**
+ * Resource response payload structure (PROTO_TYPE_RESOURCE_RESPONSE)
+ * Payload format (before encryption):
+ * [2 bytes: request_id] [N bytes: data]
+ * Note: fragment_num is in proto_header_t, not in payload
+ */
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
+typedef struct {
+    uint16_t request_id;                 // Matching request identifier (network byte order)
+    uint8_t data[PROTO_MAX_DATA_SIZE];   // Response data (variable length)
+}
+#ifndef _MSC_VER
+__attribute__((packed))
+#endif
+resource_response_payload_t;
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 /**
  * Fragment reassembly context

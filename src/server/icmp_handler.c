@@ -6,6 +6,7 @@
 
 #include "icmp_handler.h"
 #include "http_proxy.h"
+#include "multi_cache.h"
 #include "../common/protocol.h"
 #include "../common/handshake.h"
 #include "../crypto/aes_gcm.h"
@@ -89,6 +90,12 @@ static icmp_session_info_t* find_or_create_session(icmp_server_t *server,
         session->active = 1;
         session->handshake_complete = 0;
         session->data_sequence_counter = 0;  // Start at 0 for DATA packets
+        
+        // Initialize multi-response cache
+        session->response_cache = (multi_response_cache_t*)malloc(sizeof(multi_response_cache_t));
+        if (session->response_cache) {
+            cache_init(session->response_cache);
+        }
         
         char client_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr->sin_addr, client_ip, sizeof(client_ip));
@@ -312,6 +319,155 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
 }
 
 /**
+ * Handle resource request packet (HTTP URL fetch)
+ */
+static int handle_resource_request(icmp_server_t *server, icmp_session_info_t *session,
+                                   const proto_packet_t *packet, uint16_t icmp_sequence,
+                                   const struct sockaddr_in *client_addr) {
+    if (!session->handshake_complete) {
+        LOG_VERBOSE("[Server] Received RESOURCE_REQUEST before handshake complete\n");
+        return -1;
+    }
+    
+    if (!session->response_cache) {
+        LOG_VERBOSE("[Server] ERROR: No response cache initialized\n");
+        return -1;
+    }
+    
+    // Use session's internal counter for decryption
+    uint16_t data_seq = session->data_sequence_counter;
+    uint8_t fragment_num = packet->header.fragment_num;
+    
+    LOG_VERBOSE("[Server] Processing RESOURCE_REQUEST packet for session 0x%04x (ICMP seq=%d, data_seq=%d, frag_num=%d)\n", 
+                session->session_id, icmp_sequence, data_seq, fragment_num);
+    
+    // Decapsulate (decrypt) the packet
+    uint8_t decrypted[2048];
+    size_t decrypted_size;
+    
+    int result = proto_decapsulate(packet, session->session_key,
+                                    session->session_id, data_seq,
+                                    decrypted, &decrypted_size, sizeof(decrypted));
+    
+    if (result != PROTO_SUCCESS) {
+        LOG_VERBOSE("[Server] Decapsulation failed: %s\n", proto_error_string(result));
+        return -1;
+    }
+    
+    // Parse resource request payload
+    if (decrypted_size < 4) {
+        LOG_VERBOSE("[Server] Resource request too small: %zu bytes\n", decrypted_size);
+        return -1;
+    }
+    
+    resource_request_payload_t* req = (resource_request_payload_t*)decrypted;
+    uint16_t request_id = ntohs(req->request_id);
+    uint16_t url_length = ntohs(req->url_length);
+    
+    if (url_length > 1000 || url_length > decrypted_size - 4) {
+        LOG_VERBOSE("[Server] Invalid URL length: %u\n", url_length);
+        return -1;
+    }
+    
+    char url[1024];
+    memcpy(url, req->url, url_length);
+    url[url_length] = '\0';
+    
+    LOG_VERBOSE("[Server] RESOURCE_REQUEST: ID=%u, fragment=%u, URL=%s\n",
+                request_id, fragment_num, url);
+    
+    // Check if already cached
+    cache_entry_t* cached = cache_get(session->response_cache, request_id);
+    
+    if (!cached && fragment_num == 0) {
+        // New request - fetch via HTTP proxy
+        uint8_t http_response[CACHE_MAX_RESPONSE_SIZE];
+        size_t http_response_size = 0;
+        
+        LOG_VERBOSE("[Server] Fetching URL: %s\n", url);
+        
+        // Build HTTP request string
+        char http_request[2048];
+        snprintf(http_request, sizeof(http_request), "GET %s HTTP/1.1\r\nHost: localhost\r\n\r\n", url);
+        
+        int fetch_result = http_proxy_process((uint8_t*)http_request, strlen(http_request),
+                                              http_response, &http_response_size,
+                                              sizeof(http_response));
+        
+        if (fetch_result < 0) {
+            LOG_VERBOSE("[Server] HTTP fetch failed for %s\n", url);
+            // Send error response
+            const char* error_msg = "HTTP/1.1 502 Bad Gateway\r\n\r\nHTTP fetch failed";
+            http_response_size = strlen(error_msg);
+            memcpy(http_response, error_msg, http_response_size);
+        }
+        
+        // Store in cache
+        if (cache_store(session->response_cache, request_id, 
+                       http_response, http_response_size) < 0) {
+            LOG_VERBOSE("[Server] Failed to cache response for ID=%u\n", request_id);
+            return -1;
+        }
+        
+        LOG_VERBOSE("[Server] Cached response: ID=%u, size=%zu\n",
+                   request_id, http_response_size);
+    }
+    
+    // Retrieve fragment
+    uint8_t fragment_data[1200];
+    size_t fragment_size;
+    
+    int get_result = cache_get_fragment(session->response_cache, request_id,
+                                       fragment_num, fragment_data, 
+                                       &fragment_size);
+    
+    if (get_result < 0) {
+        LOG_VERBOSE("[Server] Fragment %u not found for ID=%u\n", 
+                   fragment_num, request_id);
+        return -1;
+    }
+    
+    // Build response packet
+    uint8_t response_payload[1500];
+    resource_response_payload_t* response = (resource_response_payload_t*)response_payload;
+    response->request_id = htons(request_id);
+    memcpy(response->data, fragment_data, fragment_size);
+    
+    size_t response_payload_size = 2 + fragment_size;
+    
+    // Encapsulate and send
+    proto_packet_t packets[10];
+    size_t packet_count;
+    
+    result = proto_encapsulate(response_payload, response_payload_size,
+                              session->session_key, session->session_id,
+                              data_seq, packets, &packet_count, 10);
+    
+    if (result != PROTO_SUCCESS || packet_count == 0) {
+        LOG_VERBOSE("[Server] Encapsulation failed\n");
+        return -1;
+    }
+    
+    // Set packet type to RESOURCE_RESPONSE
+    packets[0].header.type = PROTO_TYPE_RESOURCE_RESPONSE;
+    packets[0].header.fragment_num = fragment_num;
+    
+    // Send via ICMP reply
+    uint8_t send_buffer[2048];
+    memcpy(send_buffer, &packets[0].header, 8);
+    memcpy(send_buffer + 8, packets[0].payload, packets[0].payload_size);
+    size_t send_size = 8 + packets[0].payload_size;
+    
+    icmp_send_reply(server, client_addr, session->session_id, 
+                   icmp_sequence, send_buffer, send_size);
+    
+    LOG_VERBOSE("[Server] Sent RESOURCE_RESPONSE: ID=%u, fragment=%u, size=%zu\n",
+                request_id, fragment_num, fragment_size);
+    
+    return 0;
+}
+
+/**
  * Create ICMP server
  */
 icmp_server_t* icmp_server_create(void) {
@@ -468,6 +624,10 @@ static void process_icmp_packet(icmp_server_t *server, const uint8_t *buffer,
             
         case PROTO_TYPE_DATA:
             handle_data_packet(server, session, &packet, sequence, from_addr);
+            break;
+            
+        case PROTO_TYPE_RESOURCE_REQUEST:
+            handle_resource_request(server, session, &packet, sequence, from_addr);
             break;
             
         case PROTO_TYPE_KEEPALIVE:
@@ -635,8 +795,17 @@ int icmp_cleanup_sessions(icmp_server_t *server) {
     for (int i = 0; i < ICMP_MAX_SESSIONS; i++) {
         if (server->sessions[i].active) {
             if ((now - server->sessions[i].last_seen) > ICMP_SESSION_TIMEOUT_SEC) {
+                // Clean up response cache
+                if (server->sessions[i].response_cache) {
+                    cache_destroy(server->sessions[i].response_cache);
+                    free(server->sessions[i].response_cache);
+                    server->sessions[i].response_cache = NULL;
+                }
                 server->sessions[i].active = 0;
                 removed++;
+            } else if (server->sessions[i].response_cache) {
+                // Cleanup expired cache entries for active sessions
+                cache_cleanup_expired(server->sessions[i].response_cache);
             }
         }
     }
@@ -673,6 +842,15 @@ int icmp_server_destroy(icmp_server_t *server) {
     }
     
     server->running = 0;
+    
+    // Clean up all session caches
+    for (int i = 0; i < ICMP_MAX_SESSIONS; i++) {
+        if (server->sessions[i].response_cache) {
+            cache_destroy(server->sessions[i].response_cache);
+            free(server->sessions[i].response_cache);
+            server->sessions[i].response_cache = NULL;
+        }
+    }
     
     // Close socket
     if (server->raw_socket >= 0) {
