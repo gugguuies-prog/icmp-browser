@@ -722,6 +722,78 @@ static std::string FetchViaICMP(const std::string& url) {
                     html_response.append((char*)decrypted, decrypted_size);
                 }
                 break;
+                
+                // STREAMING: Check if there are more chunks to fetch
+                if (decrypted_size >= 1200) {
+                    OutputDebugStringA("First chunk received, fetching remaining chunks...");
+                    
+                    uint8_t chunk_num = 1;
+                    while (true) {
+                        // Create request for next chunk (same HTTP request, different fragment_num)
+                        proto_packet_t chunk_packets[10];
+                        size_t chunk_packet_count;
+                        
+                        int chunk_result = proto_encapsulate((uint8_t*)http_request.c_str(), http_request.size(),
+                                                            g_sessionKey, g_session->session_id, data_seq,
+                                                            chunk_packets, &chunk_packet_count, 10);
+                        
+                        if (chunk_result != PROTO_SUCCESS || chunk_packet_count == 0) break;
+                        
+                        // Modify fragment_num to request specific chunk
+                        chunk_packets[0].header.fragment_num = chunk_num;
+                        
+                        // Send chunk request
+                        uint8_t chunk_send_buffer[2048];
+                        memcpy(chunk_send_buffer, &chunk_packets[0].header, sizeof(proto_header_t));
+                        memcpy(chunk_send_buffer + sizeof(proto_header_t), chunk_packets[0].payload, chunk_packets[0].payload_size);
+                        size_t chunk_send_size = sizeof(proto_header_t) + chunk_packets[0].payload_size;
+                        
+                        uint8_t chunk_reply_buffer[8192];
+                        size_t chunk_reply_size = 0;
+                        
+                        int chunk_send_result = icmp_send_reliable(g_session, chunk_send_buffer, chunk_send_size,
+                                                                   chunk_reply_buffer, &chunk_reply_size);
+                        
+                        if (chunk_send_result != ICMP_SUCCESS || chunk_reply_size < sizeof(proto_header_t)) {
+                            char log[256];
+                            sprintf_s(log, sizeof(log), "Chunk %d fetch failed, stopping", chunk_num);
+                            OutputDebugStringA(log);
+                            break;
+                        }
+                        
+                        // Parse chunk response
+                        proto_packet_t chunk_frag;
+                        memcpy(&chunk_frag.header, chunk_reply_buffer, sizeof(proto_header_t));
+                        chunk_frag.payload_size = chunk_reply_size - sizeof(proto_header_t);
+                        memcpy(chunk_frag.payload, chunk_reply_buffer + sizeof(proto_header_t), chunk_frag.payload_size);
+                        
+                        // Decrypt chunk
+                        uint8_t chunk_decrypted[8192];
+                        size_t chunk_decrypted_size = 0;
+                        
+                        int chunk_decrypt_result = proto_decapsulate(&chunk_frag, g_sessionKey, g_session->session_id,
+                                                                    data_seq, chunk_decrypted,
+                                                                    &chunk_decrypted_size, sizeof(chunk_decrypted));
+                        
+                        if (chunk_decrypt_result == PROTO_SUCCESS && chunk_decrypted_size > 0) {
+                            html_response.append((char*)chunk_decrypted, chunk_decrypted_size);
+                            
+                            char log[256];
+                            sprintf_s(log, sizeof(log), "Received chunk %d: %zu bytes", chunk_num, chunk_decrypted_size);
+                            OutputDebugStringA(log);
+                            
+                            // If chunk is less than 1200 bytes, it's the last one
+                            if (chunk_decrypted_size < 1200) {
+                                OutputDebugStringA("Last chunk received, streaming complete");
+                                break;
+                            }
+                            
+                            chunk_num++;
+                        } else {
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
