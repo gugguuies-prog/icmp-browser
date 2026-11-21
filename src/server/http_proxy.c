@@ -151,8 +151,6 @@ static int perform_http_request(const char *host, int port, const char *http_req
     size_t total_received = 0;
     ssize_t n;
     
-    // Limit to 1200 bytes to fit in single ICMP packet (Windows limitation)
-    while (total_received < max_size - 1 && total_received < 1200) {
         n = recv(sock, response + total_received, max_size - total_received - 1, 0);
         if (n <= 0) break;
         total_received += n;
@@ -251,8 +249,6 @@ static int perform_https_request(const char *host, int port, const char *http_re
     size_t total_received = 0;
     int n;
     
-    // Limit to 1200 bytes to fit in single ICMP packet (Windows limitation)
-    while (total_received < max_size - 1 && total_received < 1200) {
         n = SSL_read(ssl, response + total_received, max_size - total_received - 1);
         if (n <= 0) break;
         total_received += n;
@@ -491,10 +487,7 @@ int http_proxy_process(const uint8_t *ip_packet, size_t packet_size,
     
     // Return raw HTTP response (not IP packet)
     // Limit response to 1200 bytes to fit in single ICMP packet (Windows limitation)
-    if (http_response_size > 1200) {
-        printf("[HTTP Proxy] Truncating response from %zu to 1200 bytes\n", http_response_size);
-        http_response_size = 1200;
-    } else if (http_response_size > max_response) {
+    if (http_response_size > max_response) {
         http_response_size = max_response;
     }
     memcpy(response_packet, http_response, http_response_size);

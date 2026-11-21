@@ -78,7 +78,12 @@ typedef struct {
     uint32_t packets_received;           // Total packets received
     uint32_t packets_sent;               // Total packets sent
     uint32_t bytes_received;             // Total bytes received
-    uint32_t bytes_sent;                 // Total bytes sent
+    uint32_t bytes_sent;                 // Total bytes sent    
+    // Response caching for multi-fragment streaming
+    uint8_t cached_response[65536];      // Cached HTTP response
+    size_t cached_response_size;         // Size of cached response
+    uint16_t cached_data_seq;            // data_seq for this cached response
+    uint8_t cache_valid;                 // Cache valid flag
     
 } icmp_session_info_t;
 

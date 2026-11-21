@@ -208,20 +208,57 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
     
     LOG_VERBOSE("[Server] Encrypting response with data_seq=%d\n", data_seq);
     
-    // Process HTTP request via proxy
-    uint8_t http_response_packet[4096];
-    size_t http_response_size;
+    // Check if client is requesting a chunk from cached response
+    uint8_t requested_chunk = packet->header.fragment_num;
+    uint8_t http_response_packet[65536];
+    size_t http_response_size = 0;
     
-    if (http_proxy_process(decrypted, decrypted_size, 
-                          http_response_packet, &http_response_size, 
-                          sizeof(http_response_packet)) < 0) {
-        LOG_VERBOSE("[Server] HTTP proxy failed, echoing request\n");
-        // Fallback: echo the request back
-        memcpy(http_response_packet, decrypted, decrypted_size);
-        http_response_size = decrypted_size;
+    if (requested_chunk > 0 && session->cache_valid && session->cached_data_seq == data_seq) {
+        // Client requesting subsequent chunk from cached response
+        LOG_VERBOSE("[Server] Client requesting chunk %d from cached response\n", requested_chunk);
+        
+        size_t chunk_size = 1200;
+        size_t chunk_offset = requested_chunk * chunk_size;
+        
+        if (chunk_offset < session->cached_response_size) {
+            size_t remaining = session->cached_response_size - chunk_offset;
+            http_response_size = (remaining > chunk_size) ? chunk_size : remaining;
+            memcpy(http_response_packet, session->cached_response + chunk_offset, http_response_size);
+            
+            LOG_VERBOSE("[Server] Sending chunk %d: offset=%zu, size=%zu\n", 
+                       requested_chunk, chunk_offset, http_response_size);
+        } else {
+            LOG_VERBOSE("[Server] ERROR: Chunk offset %zu exceeds cached size %zu\n",
+                       chunk_offset, session->cached_response_size);
+            return -1;
+        }
+    } else {
+        // New HTTP request - fetch and cache
+        LOG_VERBOSE("[Server] New HTTP request, fetching via proxy\n");
+        
+        if (http_proxy_process(decrypted, decrypted_size, 
+                              session->cached_response, &session->cached_response_size, 
+                              sizeof(session->cached_response)) < 0) {
+            LOG_VERBOSE("[Server] HTTP proxy failed, echoing request\n");
+            memcpy(session->cached_response, decrypted, decrypted_size);
+            session->cached_response_size = decrypted_size;
+        }
+        
+        // Mark cache as valid
+        session->cache_valid = 1;
+        session->cached_data_seq = data_seq;
+        
+        LOG_VERBOSE("[Server] Cached response: %zu bytes total\n", session->cached_response_size);
+        
+        // Send first chunk (1200 bytes max)
+        http_response_size = (session->cached_response_size > 1200) ? 1200 : session->cached_response_size;
+        memcpy(http_response_packet, session->cached_response, http_response_size);
+        
+        LOG_VERBOSE("[Server] Sending first chunk: %zu bytes (of %zu total)\n",
+                   http_response_size, session->cached_response_size);
     }
     
-    // Encapsulate the response
+    "// Encapsulate the response
     proto_packet_t response_packets[10];
     size_t response_count;
     
