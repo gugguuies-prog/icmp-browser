@@ -491,6 +491,18 @@ static bool InitializeICMPSession() {
         memcpy(response.payload, reply_buffer + sizeof(proto_header_t), response.payload_size);
     }
     
+    // Debug: dump first 16 bytes of reply_buffer
+    char hex_dump[512];
+    sprintf_s(hex_dump, sizeof(hex_dump),
+             "Reply buffer (first 16 bytes): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n"
+             "reply_size=%zu, header_size=%zu, payload_size=%zu",
+             reply_buffer[0], reply_buffer[1], reply_buffer[2], reply_buffer[3],
+             reply_buffer[4], reply_buffer[5], reply_buffer[6], reply_buffer[7],
+             reply_buffer[8], reply_buffer[9], reply_buffer[10], reply_buffer[11],
+             reply_buffer[12], reply_buffer[13], reply_buffer[14], reply_buffer[15],
+             reply_size, sizeof(proto_header_t), response.payload_size);
+    OutputDebugStringA(hex_dump);
+    
     // Complete handshake
     if (handshake_client_finish(&hs_ctx, &response) != 0) {
         MessageBoxA(g_hwnd, "Failed to complete handshake", "Error", MB_OK | MB_ICONERROR);
