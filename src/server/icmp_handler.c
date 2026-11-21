@@ -240,8 +240,9 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
             proto_packet_t *resp = &response_packets[frag_idx];
             size_t frag_total = 8 + resp->payload_size;
             
-            if (combined_size + frag_total > sizeof(combined_payload)) {
-                LOG_VERBOSE("[Server] WARNING: Combined payload too large, truncating\n");
+            // Windows ICMP limitation: cannot send/receive packets > 1400 bytes
+            if (combined_size + frag_total > 1400) {
+                LOG_VERBOSE("[Server] WARNING: Payload exceeds Windows ICMP limit (1400 bytes), sending only first fragment\n");
                 break;
             }
             
