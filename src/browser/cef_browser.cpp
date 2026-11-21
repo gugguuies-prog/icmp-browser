@@ -820,6 +820,14 @@ static std::string FetchViaICMP(const std::string& url) {
     
     
     // Extract HTML from HTTP response
+    // First, try to find <!doctype or <html tag
+    size_t doctype_pos = html_response.find("<!doctype");
+    if (doctype_pos == std::string::npos) doctype_pos = html_response.find("<!DOCTYPE");
+    if (doctype_pos == std::string::npos) doctype_pos = html_response.find("<html");
+    if (doctype_pos != std::string::npos) {
+        return html_response.substr(doctype_pos);
+    }
+    
     size_t body_start = html_response.find("\r\n\r\n");
     if (body_start == std::string::npos) {
         body_start = html_response.find("\n\n");
