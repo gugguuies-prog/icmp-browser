@@ -263,7 +263,6 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
         // NOW increment counter for next request/response pair
         session->data_sequence_counter++;
     }
-    }
     
     return 0;
 }
