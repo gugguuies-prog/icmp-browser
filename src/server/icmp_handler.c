@@ -258,7 +258,6 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
                    http_response_size, session->cached_response_size);
     }
     
-    "// Encapsulate the response
     proto_packet_t response_packets[10];
     size_t response_count;
     
