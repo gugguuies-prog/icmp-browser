@@ -426,14 +426,57 @@ int http_proxy_process(const uint8_t *ip_packet, size_t packet_size,
     char host[256];
     char http_request[2048];
     
-    // Extract HTTP request
-    if (extract_http_request(ip_packet, packet_size, host, sizeof(host),
-                             http_request, sizeof(http_request)) < 0) {
-        fprintf(stderr, "[HTTP Proxy] Failed to extract HTTP request\n");
-        return -1;
+    // Check if this is raw HTTP (starts with GET, POST, etc.) instead of IP packet
+    if (packet_size > 4 && 
+        (memcmp(ip_packet, "GET ", 4) == 0 || 
+         memcmp(ip_packet, "POST", 4) == 0 ||
+         memcmp(ip_packet, "HEAD", 4) == 0 ||
+         memcmp(ip_packet, "PUT ", 4) == 0)) {
+        
+        // Raw HTTP request - extract host and use as-is
+        if (packet_size >= sizeof(http_request)) {
+            fprintf(stderr, "[HTTP Proxy] HTTP request too large\n");
+            return -1;
+        }
+        
+        memcpy(http_request, ip_packet, packet_size);
+        http_request[packet_size] = '\0';
+        
+        // Extract Host header
+        char *host_line = strstr(http_request, "Host: ");
+        if (!host_line) host_line = strstr(http_request, "host: ");
+        
+        if (!host_line) {
+            fprintf(stderr, "[HTTP Proxy] No Host header found\n");
+            return -1;
+        }
+        
+        host_line += 6;  // Skip "Host: "
+        char *end = strstr(host_line, "\r\n");
+        if (!end) end = strstr(host_line, "\n");
+        
+        if (end) {
+            size_t len = end - host_line;
+            if (len > sizeof(host) - 1) len = sizeof(host) - 1;
+            memcpy(host, host_line, len);
+            host[len] = '\0';
+        } else {
+            fprintf(stderr, "[HTTP Proxy] Malformed Host header\n");
+            return -1;
+        }
+        
+        printf("[HTTP Proxy] Raw HTTP request to %s\n", host);
+        
+    } else {
+        // IP packet - extract HTTP from TCP payload
+        if (extract_http_request(ip_packet, packet_size, host, sizeof(host),
+                                 http_request, sizeof(http_request)) < 0) {
+            fprintf(stderr, "[HTTP Proxy] Failed to extract HTTP request\n");
+            return -1;
+        }
+        
+        printf("[HTTP Proxy] Request to %s\n", host);
     }
-    
-    printf("[HTTP Proxy] Request to %s\n", host);
     
     // Perform HTTP/HTTPS request with redirect following
     uint8_t http_response[MAX_HTTP_RESPONSE];
@@ -444,14 +487,12 @@ int http_proxy_process(const uint8_t *ip_packet, size_t packet_size,
         return -1;
     }
     
-    // Create response packet
-    *response_size = create_response_packet(ip_packet, http_response, http_response_size,
-                                           response_packet, max_response);
-    
-    if (*response_size == 0) {
-        fprintf(stderr, "[HTTP Proxy] Failed to create response packet\n");
-        return -1;
+    // Return raw HTTP response (not IP packet)
+    if (http_response_size > max_response) {
+        http_response_size = max_response;
     }
+    memcpy(response_packet, http_response, http_response_size);
+    *response_size = http_response_size;
     
     return 0;
 }
