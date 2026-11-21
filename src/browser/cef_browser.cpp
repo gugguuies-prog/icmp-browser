@@ -792,7 +792,8 @@ static std::string FetchViaICMP(const std::string& url) {
                         }
                     }
                 
-                break; // Exit after streaming complete}
+                break; // Exit after streaming complete
+            }
             }
         }
     }
