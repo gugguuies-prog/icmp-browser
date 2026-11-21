@@ -389,8 +389,13 @@ void OnNavigate() {
     // Fetch via ICMP and load in CEF
     std::string html = FetchViaICMP(urlStr);
     if (!html.empty() && g_browser.get()) {
-        std::string dataUrl = "data:text/html;charset=utf-8," + html;
-        g_browser->GetMainFrame()->LoadURL(dataUrl);
+        // Log what we're about to display
+        char log[512];
+        sprintf_s(log, sizeof(log), "Displaying HTML (%zu bytes, first 100 chars): %.100s", html.size(), html.c_str());
+        OutputDebugStringA(log);
+        
+        // Use LoadString instead of LoadURL for proper HTML rendering
+        g_browser->GetMainFrame()->LoadString(html, "http://icmp-browser/");
     }
 }
 
