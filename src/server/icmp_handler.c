@@ -136,6 +136,12 @@ static int handle_handshake(icmp_server_t *server, icmp_session_info_t *session,
     
     session->handshake_complete = 1;
     LOG_VERBOSE("[Server] Handshake complete! Session key derived for 0x%04x\n", session->session_id);
+    LOG_VERBOSE("[Server] Client pubkey (first 8): %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                hs_ctx.client_public_key[0], hs_ctx.client_public_key[1], hs_ctx.client_public_key[2], hs_ctx.client_public_key[3],
+                hs_ctx.client_public_key[4], hs_ctx.client_public_key[5], hs_ctx.client_public_key[6], hs_ctx.client_public_key[7]);
+    LOG_VERBOSE("[Server] Server pubkey (first 8): %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                hs_ctx.server_public_key[0], hs_ctx.server_public_key[1], hs_ctx.server_public_key[2], hs_ctx.server_public_key[3],
+                hs_ctx.server_public_key[4], hs_ctx.server_public_key[5], hs_ctx.server_public_key[6], hs_ctx.server_public_key[7]);
     LOG_VERBOSE("[Server] Session key (first 8 bytes): %02X %02X %02X %02X %02X %02X %02X %02X\n",
                 session->session_key[0], session->session_key[1], session->session_key[2], session->session_key[3],
                 session->session_key[4], session->session_key[5], session->session_key[6], session->session_key[7]);

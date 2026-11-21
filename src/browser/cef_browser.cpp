@@ -503,16 +503,24 @@ static bool InitializeICMPSession() {
     // Copy session key
     memcpy(g_sessionKey, hs_ctx.session_key, sizeof(g_sessionKey));
     
-    // Debug: log session key
-    char key_str[256];
-    sprintf_s(key_str, sizeof(key_str),
-             "Client session key: %02X %02X %02X %02X %02X %02X %02X %02X",
+    // Debug: log public keys and session key
+    char debug[1024];
+    sprintf_s(debug, sizeof(debug),
+             "Handshake complete!\n"
+             "Client pubkey (first 8): %02X %02X %02X %02X %02X %02X %02X %02X\n"
+             "Server pubkey (first 8): %02X %02X %02X %02X %02X %02X %02X %02X\n"
+             "Session key (first 8): %02X %02X %02X %02X %02X %02X %02X %02X",
+             hs_ctx.client_public_key[0], hs_ctx.client_public_key[1], hs_ctx.client_public_key[2], hs_ctx.client_public_key[3],
+             hs_ctx.client_public_key[4], hs_ctx.client_public_key[5], hs_ctx.client_public_key[6], hs_ctx.client_public_key[7],
+             hs_ctx.server_public_key[0], hs_ctx.server_public_key[1], hs_ctx.server_public_key[2], hs_ctx.server_public_key[3],
+             hs_ctx.server_public_key[4], hs_ctx.server_public_key[5], hs_ctx.server_public_key[6], hs_ctx.server_public_key[7],
              g_sessionKey[0], g_sessionKey[1], g_sessionKey[2], g_sessionKey[3],
              g_sessionKey[4], g_sessionKey[5], g_sessionKey[6], g_sessionKey[7]);
-    OutputDebugStringA(key_str);
+    OutputDebugStringA(debug);
     
     handshake_cleanup(&hs_ctx);
     g_handshakeComplete = true;
+    g_dataSequence = 0;  // Reset data sequence counter for new session
     
     return true;
 }
