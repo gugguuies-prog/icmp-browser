@@ -297,8 +297,14 @@ static int handle_data_packet(icmp_server_t *server, icmp_session_info_t *sessio
         LOG_VERBOSE("[Server] Sent ALL %zu fragments in single packet (%zu bytes total)\n", 
                    response_count, combined_size);
         
-        // NOW increment counter for next request/response pair
-        session->data_sequence_counter++;
+        // Only increment counter if this is the last chunk or non-cached response
+        uint8_t is_last_chunk = (requested_chunk > 0) ? (http_response_size < 1200) : 1;
+        if (is_last_chunk) {
+            session->data_sequence_counter++;
+            LOG_VERBOSE("[Server] Incremented data_seq to %d (last chunk sent)\n", session->data_sequence_counter);
+        } else {
+            LOG_VERBOSE("[Server] NOT incrementing data_seq (more chunks remaining)\n");
+        }
     }
     
     return 0;
