@@ -427,6 +427,11 @@ void OnSettings() {
 
 // Helper functions for ICMP communication
 static bool InitializeICMPSession() {
+    // Return true if already connected
+    if (g_session != NULL && g_handshakeComplete) {
+        return true;
+    }
+    
     // Destroy old session if exists
     if (g_session != NULL) {
         icmp_session_destroy(g_session);
