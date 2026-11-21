@@ -697,6 +697,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(nCmdShow);
 
+    // Initialize global state
+    g_session = NULL;
+    g_handshakeComplete = false;
+    g_dataSequence = 0;
+    memset(g_sessionKey, 0, sizeof(g_sessionKey));
+
     // Initialize CEF
     CefMainArgs main_args(hInstance);
     CefRefPtr<BrowserApp> app(new BrowserApp);
