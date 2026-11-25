@@ -45,9 +45,8 @@ extern "C" {
 #define PROTO_TYPE_HANDSHAKE 0x02        // DH key exchange
 #define PROTO_TYPE_ACK 0x03              // Acknowledgment
 #define PROTO_TYPE_KEEPALIVE 0x04        // Keep connection alive
-#define PROTO_TYPE_RESET 0x05            // Reset connection
-#define PROTO_TYPE_RESOURCE_REQUEST 0x06 // Resource request (HTTP URL)
-#define PROTO_TYPE_RESOURCE_RESPONSE 0x07 // Resource response (HTTP data)
+#define PROTO_TYPE_RESOURCE_REQUEST 0x05 // Resource request (HTTP URL)
+#define PROTO_TYPE_RESOURCE_RESPONSE 0x06 // Resource response (HTTP data)
 
 // Packet flags
 #define PROTO_FLAG_ENCRYPTED 0x01        // Payload is encrypted

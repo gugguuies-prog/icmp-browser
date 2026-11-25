@@ -431,8 +431,6 @@ const char* proto_type_string(uint8_t type) {
             return "ACK";
         case PROTO_TYPE_KEEPALIVE:
             return "KEEPALIVE";
-        case PROTO_TYPE_RESET:
-            return "RESET";
         case PROTO_TYPE_RESOURCE_REQUEST:
             return "RESOURCE_REQUEST";
         case PROTO_TYPE_RESOURCE_RESPONSE:

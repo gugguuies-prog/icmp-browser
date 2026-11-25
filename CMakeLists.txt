@@ -207,6 +207,30 @@ if(PLATFORM_WINDOWS AND BUILD_CLIENT)
     )
     
     message(STATUS "Building simple browser: icmp_browser_simple.exe")
+
+    # HTTP Proxy standalone executable (console application)
+    add_executable(icmp_http_proxy
+        src/client/icmp_http_proxy_main.c
+        src/client/http_proxy.c
+        src/client/icmp_engine.c
+        ${COMMON_SOURCES}
+        ${CRYPTO_SOURCES}
+    )
+    
+    target_link_libraries(icmp_http_proxy PRIVATE
+        ${OPENSSL_LIBRARIES}
+        ${ZLIB_LIBRARIES}
+        Threads::Threads
+        iphlpapi
+        ws2_32
+    )
+    
+    set_target_properties(icmp_http_proxy PROPERTIES
+        WIN32_EXECUTABLE FALSE
+    )
+    
+    message(STATUS "Building HTTP proxy: icmp_http_proxy.exe")
+
     
 endif()
 

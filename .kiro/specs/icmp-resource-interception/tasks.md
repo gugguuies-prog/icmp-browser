@@ -6,20 +6,20 @@ This implementation extends the ICMP Browser to intercept all CEF resource reque
 
 ## Tasks
 
-- [ ] 1. Extend protocol with resource request packet types
+- [x] 1. Extend protocol with resource request packet types
   - Create RESOURCE_REQUEST (0x05) and RESOURCE_RESPONSE (0x06) packet type definitions
   - Define payload structures in src/common/proto.h
   - Add request_id field (2 bytes) to packet payloads
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 2. Implement server-side multi-response cache
-  - [ ] 2.1 Create multi-cache data structures
+- [x] 2. Implement server-side multi-response cache
+  - [x] 2.1 Create multi-cache data structures
     - Create src/server/multi_cache.h and multi_cache.c files
     - Define cache_entry_t structure with request_id, response_data, size, timestamp
     - Define multi_response_cache_t structure with 50 entry array and mutex
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
   
-  - [ ] 2.2 Implement cache operations
+  - [x] 2.2 Implement cache operations
     - Implement cache_init(), cache_store(), cache_get() functions
     - Implement cache_get_fragment() for fragment retrieval
     - Implement cache_evict_oldest() for LRU eviction
