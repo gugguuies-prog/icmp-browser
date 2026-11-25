@@ -97,12 +97,12 @@ int main(int argc, char *argv[]) {
         proxy_port = (uint16_t)atoi(argv[2]);
     }
     
-    printf("╔══════════════════════════════════════════════════════╗\n");
-    printf("║      ICMP HTTP Proxy - Standalone Version           ║\n");
-    printf("╠══════════════════════════════════════════════════════╣\n");
-    printf("║ Server:      %s                            \n", server_ip);
-    printf("║ Proxy Port:  %d                                      \n", proxy_port);
-    printf("╚══════════════════════════════════════════════════════╝\n\n");
+    printf("+======================================================+\n");
+    printf("|      ICMP HTTP Proxy - Standalone Version           |\n");
+    printf("+======================================================+\n");
+    printf("| Server:      %s                            \n", server_ip);
+    printf("| Proxy Port:  %d                                      \n", proxy_port);
+    printf("+======================================================+\n\n");
     
     // Setup signal handlers
     signal(SIGINT, signal_handler);
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    printf("[Main] ✓ Handshake complete, session key established\n\n");
+    printf("[Main] √ Handshake complete, session key established\n\n");
 
     // Copy session key to global for use by proxy
     memcpy(g_session_key, session_key, 32);
@@ -154,18 +154,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    printf("[Main] ✓ HTTP proxy listening\n\n");
-    printf("╔══════════════════════════════════════════════════════╗\n");
-    printf("║  Proxy is running!                                   ║\n");
-    printf("╠══════════════════════════════════════════════════════╣\n");
-    printf("║  Configure your browser to use:                      ║\n");
-    printf("║  HTTP Proxy: 127.0.0.1:%d                            \n", proxy_port);
-    printf("║                                                        ║\n");
-    printf("║  Chrome:  Settings → System → Proxy settings         ║\n");
-    printf("║  Firefox: Settings → Network → Manual proxy          ║\n");
-    printf("║                                                        ║\n");
-    printf("║  Press Ctrl+C to stop                                ║\n");
-    printf("╚══════════════════════════════════════════════════════╝\n\n");
+    printf("[Main] √ HTTP proxy listening\n\n");
+    printf("+======================================================+\n");
+    printf("|  Proxy is running!                                   |\n");
+    printf("+======================================================+\n");
+    printf("|  Configure your browser to use:                      |\n");
+    printf("|  HTTP Proxy: 127.0.0.1:%d                            \n", proxy_port);
+    printf("|                                                        |\n");
+    printf("|  Chrome:  Settings -> System -> Proxy settings         |\n");
+    printf("|  Firefox: Settings -> Network -> Manual proxy          |\n");
+    printf("|                                                        |\n");
+    printf("|  Press Ctrl+C to stop                                |\n");
+    printf("+======================================================+\n\n");
     
     // Main loop - print stats every 10 seconds
     while (g_running) {
