@@ -28,6 +28,63 @@ void signal_handler(int sig) {
     g_running = 0;
 }
 
+/**
+ * Helper: Perform complete DH handshake with server
+ */
+int client_perform_handshake(icmp_session_t *session, uint8_t session_key[32]) {
+    handshake_context_t ctx;
+    
+    // Initialize handshake
+    if (handshake_init(&ctx, session->session_id) != HANDSHAKE_SUCCESS) {
+        return -1;
+    }
+    
+    // Start handshake (generate client public key)
+    proto_packet_t request_packet;
+    if (handshake_client_start(&ctx, &request_packet) != HANDSHAKE_SUCCESS) {
+        handshake_cleanup(&ctx);
+        return -2;
+    }
+    
+    printf("[Handshake] Sending client public key...");
+    
+    // Send handshake request via ICMP
+    uint8_t send_buffer[2048];
+    memcpy(send_buffer, &request_packet.header, sizeof(proto_header_t));
+    memcpy(send_buffer + sizeof(proto_header_t), request_packet.payload, request_packet.payload_size);
+    size_t send_size = sizeof(proto_header_t) + request_packet.payload_size;
+    
+    uint8_t reply_buffer[2048];
+    size_t reply_size = 0;
+    
+    int result = icmp_send_reliable(session, send_buffer, send_size, reply_buffer, &reply_size);
+    if (result != ICMP_SUCCESS || reply_size < sizeof(proto_header_t)) {
+        printf("[Handshake] Failed to receive server response");
+        handshake_cleanup(&ctx);
+        return -3;
+    }
+    
+    // Parse server response
+    proto_packet_t response_packet;
+    memcpy(&response_packet.header, reply_buffer, sizeof(proto_header_t));
+    response_packet.payload_size = reply_size - sizeof(proto_header_t);
+    memcpy(response_packet.payload, reply_buffer + sizeof(proto_header_t), response_packet.payload_size);
+    
+    printf("[Handshake] Received server public key, computing shared secret...");
+    
+    // Finish handshake (compute shared secret and derive key)
+    if (handshake_client_finish(&ctx, &response_packet) != HANDSHAKE_SUCCESS) {
+        handshake_cleanup(&ctx);
+        return -4;
+    }
+    
+    // Get session key
+    handshake_get_session_key(&ctx, session_key);
+    
+    handshake_cleanup(&ctx);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     // Parse command line arguments
     const char *server_ip = "192.168.1.40";
