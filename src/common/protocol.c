@@ -86,6 +86,18 @@ int proto_encapsulate(const uint8_t *ip_packet, size_t ip_size,
         // Store IV at beginning of payload
         memcpy(pkt->payload, iv, 12);
         
+        
+        // DEBUG: Print encryption parameters
+        printf("[ENCRYPT DEBUG] session_id=0x%04x, sequence=%d, fragment=%zu/%zu\n",
+               session_id, sequence, i, fragments_needed);
+        printf("[ENCRYPT DEBUG] AAD=[%02X %02X %02X %02X], fragment_size=%zu\n",
+               aad[0], aad[1], aad[2], aad[3], fragment_size);
+        printf("[ENCRYPT DEBUG] IV (first 8): ");
+        for (int k = 0; k < 8; k++) printf("%02X ", iv[k]);
+        printf("\n");
+        printf("[ENCRYPT DEBUG] Session key (first 8): ");
+        for (int k = 0; k < 8; k++) printf("%02X ", session_key[k]);
+        printf("\n");
         // Encrypt fragment (after IV)
         uint8_t tag[16];
         
@@ -149,6 +161,18 @@ int proto_decapsulate(const proto_packet_t *packet,
     const uint8_t *ciphertext = packet->payload + 12;
     const uint8_t *tag = packet->payload + 12 + ciphertext_size;
     
+    
+    // DEBUG: Print decryption parameters
+    printf("[DECRYPT DEBUG] session_id=0x%04x, sequence=%d, AAD=[%02X %02X %02X %02X]\n",
+           session_id, sequence, aad[0], aad[1], aad[2], aad[3]);
+    printf("[DECRYPT DEBUG] payload_size=%zu, ciphertext_size=%zu\n",
+           packet->payload_size, ciphertext_size);
+    printf("[DECRYPT DEBUG] IV (first 8): ");
+    for (int i = 0; i < 8; i++) printf("%02X ", iv[i]);
+    printf("\n");
+    printf("[DECRYPT DEBUG] Session key (first 8): ");
+    for (int i = 0; i < 8; i++) printf("%02X ", session_key[i]);
+    printf("\n");
     // Decrypt
     int result = aes_gcm_decrypt(
         session_key, 32,
