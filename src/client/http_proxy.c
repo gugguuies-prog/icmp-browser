@@ -88,6 +88,17 @@ http_proxy_t* http_proxy_create(uint16_t port, icmp_session_t *icmp_session) {
         free(proxy);
         return NULL;
     }
+
+    // Initialize data sequence counter
+    proxy->data_sequence_number = 0;
+    if (mutex_init(&proxy->data_seq_lock) != 0) {
+        mutex_destroy(&proxy->stats_lock);
+    mutex_destroy(&proxy->data_seq_lock);
+        mutex_destroy(&proxy->clients_lock);
+        free(proxy->clients);
+        free(proxy);
+        return NULL;
+    }
     
     return proxy;
 }
@@ -191,6 +202,7 @@ void http_proxy_destroy(http_proxy_t *proxy) {
     
     mutex_destroy(&proxy->clients_lock);
     mutex_destroy(&proxy->stats_lock);
+    mutex_destroy(&proxy->data_seq_lock);
     
     free(proxy->clients);
     free(proxy);
@@ -330,7 +342,11 @@ static void* client_handler_thread(void *arg) {
             // Get session key (must be set after handshake)
             extern uint8_t g_session_key[32];  // Global session key from main
             uint8_t *session_key = g_session_key;
-            uint16_t data_seq = proxy->icmp_session->sequence_counter;
+            // Get and increment data sequence number (thread-safe)
+            mutex_lock(&proxy->data_seq_lock);
+            uint16_t data_seq = proxy->data_sequence_number;
+            proxy->data_sequence_number++;
+            mutex_unlock(&proxy->data_seq_lock);
             
             printf("[HTTP Proxy] Tunneling via ICMP (session=0x%04x, data_seq=%d)\n",
                    proxy->icmp_session->session_id, data_seq);

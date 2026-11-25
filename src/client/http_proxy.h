@@ -103,6 +103,8 @@ struct http_proxy_s {
     uint64_t total_requests;        // Total requests handled
     uint64_t total_bytes_sent;      // Total bytes sent to clients
     uint64_t total_bytes_received;  // Total bytes received from clients
+    uint16_t data_sequence_number;    // Current data sequence number for ICMP protocol
+    mutex_t data_seq_lock;             // Mutex for data_sequence_number
 };
 
 /**
