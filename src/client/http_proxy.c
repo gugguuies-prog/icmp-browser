@@ -419,6 +419,13 @@ static void* client_handler_thread(void *arg) {
             full_response_size += decrypted_size;
             
             printf("[HTTP Proxy] First chunk: %zu bytes\n", decrypted_size);
+            // DEBUG: Print first 100 bytes of decrypted data
+            printf("[DEBUG] First 100 chars of decrypted: ");
+            for (size_t i = 0; i < decrypted_size && i < 100; i++) {
+                if (decrypted[i] >= 32 && decrypted[i] < 127) printf("%c", decrypted[i]);
+                else printf(".");
+            }
+            printf("\n");
             
             // STREAMING: If first chunk is 1200 bytes, fetch more chunks
             if (decrypted_size >= 1200) {
